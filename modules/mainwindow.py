@@ -41,7 +41,6 @@ from modules.case_audit_tab import CaseAuditTab
 from ui.mindmap import MindMapWidget
 from modules.sidebar_navigation import SidebarNavigation
 from modules.timeline_tab import TimelineTab
-from modules.suspicion_dashboard import SuspicionDashboard
 
 SECTOR_SIZE = 512
 
@@ -319,16 +318,9 @@ class MainWindow(QMainWindow):
         self.case_audit_widget = CaseAuditTab(self)
         self.result_viewer.addTab(self.case_audit_widget, 'Case Audit')
 
-        # Add suspicion dashboard as overview tab
-        self.suspicion_dashboard = SuspicionDashboard(self)
-        self.result_viewer.insertTab(0, self.suspicion_dashboard, 'Dashboard')
-
         # Add timeline visualization tab
         self.timeline_tab = TimelineTab(self)
         self.result_viewer.addTab(self.timeline_tab, 'Timeline')
-
-        # Set dashboard as default active tab
-        self.result_viewer.setCurrentIndex(0)
 
         self.viewer_tab = QTabWidget(self)
         self.viewer_tab.setObjectName("viewerPanel")
@@ -557,6 +549,10 @@ class MainWindow(QMainWindow):
         session_data['total_files'] = len(session_data['files'])
         session_data['has_data'] = session_data['total_files'] > 0
 
+        # Include risk scan results if available
+        if hasattr(self, 'priority_widget') and self.priority_widget.scored_files:
+            session_data['risk_scan_results'] = self.priority_widget.scored_files
+
         return session_data
 
     def _collect_files_recursive(self, session_data, start_offset, inode, path_prefix, partition_name=""):
@@ -691,18 +687,17 @@ class MainWindow(QMainWindow):
     def on_sidebar_navigation(self, section_name):
         """Handle sidebar navigation clicks."""
         tab_map = {
-            'Dashboard': 0,
             'Add Evidence': None,
             'Remove Evidence': None,
             'Mount Image': None,
-            'File Listing': 1,
-            'Deleted Files': 2,
-            'Registry': 3,
-            'File Search': 4,
-            'Mind Map': 5,
-            'Priority Scan': 6,
-            'Case Audit': 7,
-            'Timeline': 8,
+            'File Listing': 0,
+            'Deleted Files': 1,
+            'Registry': 2,
+            'File Search': 3,
+            'Mind Map': 4,
+            'Priority Scan': 5,
+            'Case Audit': 6,
+            'Timeline': 7,
         }
 
         # Handle action items
@@ -746,7 +741,6 @@ class MainWindow(QMainWindow):
         self.deleted_files_widget.clear()
         self.priority_widget.clear()
         self.case_audit_widget.clear()
-        self.suspicion_dashboard.clear()
         self.timeline_tab.clear()
 
     def clear_viewers(self):

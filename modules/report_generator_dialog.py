@@ -140,6 +140,11 @@ class ReportGeneratorThread(QThread):
             else:
                 self.progress.emit("DEBUG: No session data to load (will scan artifacts directory instead)")
 
+            # Inject risk scan results if available
+            if session_data and session_data.get('risk_scan_results'):
+                self.progress.emit(f"Loading {len(session_data['risk_scan_results'])} risk scan results...")
+                generator.set_risk_scan_results(session_data['risk_scan_results'])
+
             self.progress.emit("Verifying master image...")
 
             # Generate report

@@ -299,6 +299,7 @@ class ForensicReportGenerator:
         self.bulk_extractor_summary: Dict[str, int] = {}
         self.warnings: List[str] = []
         self.notes: str = ""
+        self.risk_scan_results: List[Dict] = []
 
         # Statistics
         self.stats = {
@@ -310,6 +311,78 @@ class ForensicReportGenerator:
         }
 
         logger.info(f"Initialized report generator for case {case_id}")
+
+    def set_risk_scan_results(self, results: List[Dict]) -> None:
+        """Store risk scan results for inclusion in the report."""
+        self.risk_scan_results = results or []
+
+    def _compute_risk_summary(self) -> Dict[str, Any]:
+        """Compute severity counts, MITRE stage counts, top indicators, and recommendations from risk scan results."""
+        mitre_stages = [
+            "Initial Access", "Execution", "Persistence", "Priv Escalation",
+            "Defense Evasion", "Credential Access", "Discovery",
+            "Lateral Movement", "Collection", "Exfiltration", "Impact",
+        ]
+
+        severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Info": 0}
+        stage_counts: Dict[str, int] = {s: 0 for s in mitre_stages}
+
+        for item in self.risk_scan_results:
+            severity = item.get("severity", "Info")
+            if severity in severity_counts:
+                severity_counts[severity] += 1
+            for stage in item.get("mitre_stages", []):
+                if stage in stage_counts:
+                    stage_counts[stage] += 1
+
+        # Top 10 indicators by score
+        sorted_results = sorted(self.risk_scan_results, key=lambda r: r.get("score", 0), reverse=True)
+        top_indicators = sorted_results[:10]
+
+        # Context-aware recommendations
+        recommendations = self._generate_risk_recommendations(severity_counts, stage_counts)
+
+        return {
+            'total': len(self.risk_scan_results),
+            'severity_counts': severity_counts,
+            'stage_counts': stage_counts,
+            'mitre_stages': mitre_stages,
+            'top_indicators': top_indicators,
+            'recommendations': recommendations,
+        }
+
+    @staticmethod
+    def _generate_risk_recommendations(
+        severity_counts: Dict[str, int],
+        stage_counts: Dict[str, int],
+    ) -> List[str]:
+        """Produce context-aware investigative recommendations based on risk scan data."""
+        actions: List[str] = []
+
+        if severity_counts.get("Critical", 0) > 0:
+            actions.append("[URGENT] Isolate and preserve evidence for critical-severity artifacts immediately.")
+        if severity_counts.get("High", 0) > 0:
+            actions.append("Review high-severity artifacts for signs of active compromise.")
+        if stage_counts.get("Persistence", 0) > 0:
+            actions.append("Investigate persistence mechanisms - check startup entries, scheduled tasks, and services.")
+        if stage_counts.get("Credential Access", 0) > 0:
+            actions.append("Check for credential theft indicators - review SAM/NTDS dumps and browser credential stores.")
+        if stage_counts.get("Exfiltration", 0) > 0:
+            actions.append("Examine network artifacts for data exfiltration - check DNS logs, HTTP uploads, and cloud sync activity.")
+        if stage_counts.get("Lateral Movement", 0) > 0:
+            actions.append("Trace lateral movement paths - review RDP, PsExec, WMI, and SMB connections.")
+        if stage_counts.get("Defense Evasion", 0) > 0:
+            actions.append("Inspect defense evasion techniques - look for log tampering, timestomping, and AV disabling.")
+        if stage_counts.get("Execution", 0) > 0:
+            actions.append("Analyze execution artifacts - review prefetch, shimcache, amcache, and PowerShell logs.")
+        if stage_counts.get("Impact", 0) > 0:
+            actions.append("Assess impact scope - check for ransomware indicators, data destruction, or service disruption.")
+
+        if not actions:
+            actions.append("No high-priority recommendations at this time. Continue routine analysis.")
+
+        actions.append("Generate a forensic report to document findings and maintain chain-of-custody.")
+        return actions
 
     def add_chain_of_custody_entry(self, action: str, source: str = None,
                                    target: str = None, tools: str = None,
@@ -825,7 +898,8 @@ class ForensicReportGenerator:
             'warnings': self.warnings,
             'artifacts_sample': [a.to_dict() for a in self.artifacts[:100]],  # First 100 for report
             'missing_tools': missing_tools,  # FIX #9
-            'timestamp_str': self.timestamp_str  # For download links
+            'timestamp_str': self.timestamp_str,  # For download links
+            'risk_summary': self._compute_risk_summary() if self.risk_scan_results else None
         }
 
     def _format_notable_reason(self, reason: str, artifact: Dict[str, Any]) -> str:
@@ -1473,11 +1547,111 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Bulk Extractor Results
-        if data['bulk_extractor']:
-            html += """
+        # Risk Assessment Overview
+        risk_summary = data.get('risk_summary')
+        if risk_summary:
+            sc = risk_summary['severity_counts']
+            html += f"""
     <div class="section">
-        <h2>8. Bulk Extractor Results</h2>
+        <h2>8. Risk Assessment Overview</h2>
+        <p>Automated risk scoring of <strong>{risk_summary['total']:,}</strong> scanned artifacts:</p>
+        <div class="stats-grid">
+            <div class="stat-card" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                <div class="stat-label">Critical</div>
+                <div class="stat-value">{sc['Critical']}</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #e67e22, #d35400);">
+                <div class="stat-label">High</div>
+                <div class="stat-value">{sc['High']}</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #f1c40f, #f39c12);">
+                <div class="stat-label">Medium</div>
+                <div class="stat-value">{sc['Medium']}</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #3498db, #2980b9);">
+                <div class="stat-label">Low</div>
+                <div class="stat-value">{sc['Low']}</div>
+            </div>
+        </div>
+"""
+            # Top suspicious indicators table
+            if risk_summary['top_indicators']:
+                html += """
+        <h3>Top Suspicious Indicators</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Artifact</th>
+                    <th>Score</th>
+                    <th>Severity</th>
+                    <th>Top Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+                severity_badge_map = {
+                    'Critical': 'badge-danger',
+                    'High': 'badge-warning',
+                    'Medium': 'badge-info',
+                    'Low': 'badge-success',
+                    'Info': 'badge-info',
+                }
+                for idx, ind in enumerate(risk_summary['top_indicators'], 1):
+                    reasons = ind.get('reasons', [])
+                    top_reason = reasons[0] if reasons else ''
+                    badge_cls = severity_badge_map.get(ind.get('severity', 'Info'), 'badge-info')
+                    html += f"""
+                <tr>
+                    <td>{idx}</td>
+                    <td><code>{ind.get('name', '')}</code></td>
+                    <td><strong>{ind.get('score', 0)}</strong></td>
+                    <td><span class="badge {badge_cls}">{ind.get('severity', 'Info')}</span></td>
+                    <td>{top_reason}</td>
+                </tr>
+"""
+                html += """            </tbody>
+        </table>
+"""
+            html += """    </div>
+"""
+
+        # MITRE ATT&CK Mapping
+        if risk_summary:
+            active_stages = [(s, c) for s, c in risk_summary['stage_counts'].items() if c > 0]
+            if active_stages:
+                html += """
+    <div class="section">
+        <h2>9. MITRE ATT&CK Mapping</h2>
+        <p>Artifacts mapped to MITRE ATT&CK kill-chain stages (showing stages with hits):</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Stage</th>
+                    <th>Artifact Count</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+                for stage, count in active_stages:
+                    html += f"""
+                <tr>
+                    <td><strong>{stage}</strong></td>
+                    <td>{count}</td>
+                </tr>
+"""
+                html += """            </tbody>
+        </table>
+    </div>
+"""
+
+        # Bulk Extractor Results
+        # Section number adjusts based on whether risk sections are present
+        be_section = 10 if risk_summary else 8
+        if data['bulk_extractor']:
+            html += f"""
+    <div class="section">
+        <h2>{be_section}. Bulk Extractor Results</h2>
         <p>Automated artifact extraction summary:</p>
         <div class="stats-grid">
 """
@@ -1503,10 +1677,22 @@ class ForensicReportGenerator:
 """
 
         # Recommendations
+        rec_section = (11 if risk_summary else 9)
         html += f"""
     <div class="section">
-        <h2>9. Recommendations & Next Steps</h2>
-        <h3>Analyst Recommendations:</h3>
+        <h2>{rec_section}. Recommendations &amp; Next Steps</h2>
+"""
+        # Context-aware recommendations from risk scan data
+        if risk_summary and risk_summary.get('recommendations'):
+            html += """        <h3>Risk-Based Recommendations:</h3>
+        <ul>
+"""
+            for rec in risk_summary['recommendations']:
+                html += f"            <li>{rec}</li>\n"
+            html += """        </ul>
+"""
+
+        html += f"""        <h3>Analyst Recommendations:</h3>
         <ul>
             <li><strong>Priority Review:</strong> Focus on the {data['stats']['notable_artifacts']} notable artifacts identified in Section 7</li>
             <li><strong>Executable Analysis:</strong> All executable files should be analyzed for malicious behavior</li>
