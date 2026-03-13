@@ -1,0 +1,38 @@
+# Virtual environment
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Config with API keys
+config.ini
+
+# Logs and cache
+logs/
+cache/
+*.log
+app_log.txt
+
+# Carved/evidence output
+carved_files/
+evidence/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Pytest
+.pytest_cache/
+
+# Claude Code
+.claude/

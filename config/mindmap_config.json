@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "description": "Mind Map configuration for unlimited filesystem scanning",
+  "max_nodes_guard": 1000000,
+  "max_nodes_guard_description": "Emergency safety limit to prevent runaway scans. This is NOT a normal traversal limit - it only stops incorrectly configured or infinite-loop jobs. Default: 1,000,000 nodes.",
+  "batch_emit_size": 100,
+  "batch_emit_size_description": "Number of nodes to collect before emitting to UI. Larger batches = better performance but less frequent updates. Default: 100.",
+  "checkpoint_interval": 1000,
+  "checkpoint_interval_description": "Write partial tree to temp file every N nodes for recovery. Default: 1000.",
+  "enable_full_scan_by_default": false,
+  "enable_full_scan_by_default_description": "If true, full scan is enabled without confirmation. Use only in automated/CLI mode. Default: false (require user confirmation)."
+}

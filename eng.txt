@@ -1,0 +1,251 @@
+You want a high-level, professional, AI-agent-ready prompt that tells your development agent to:
+
+Deeply review your ForensAI app
+
+Improve architecture + algorithms
+
+Upgrade UI/UX professionally
+
+Make tabs expandable inside same window (no external popups)
+
+Optimize performance + intelligence
+
+Make everything production-grade
+
+Since you didn’t provide stack details, I’ll write it framework-agnostic but senior-level, so your agent treats this like an enterprise cybersecurity product — not a student app.
+
+You can copy this directly 👇
+
+🔥 MASTER PROMPT FOR YOUR AGENT
+
+You are a senior-level Software Architect, Cybersecurity Engineer, AI Engineer, and UI/UX Expert.
+
+Your task is to perform a full professional audit, enhancement, and architectural upgrade of my application called ForensAI (AI-powered digital forensics platform).
+
+Your responsibilities include:
+
+1️⃣ Deep Technical Review
+
+Perform a complete review of:
+
+Application architecture
+
+Code structure and modularity
+
+Performance bottlenecks
+
+Security weaknesses
+
+Scalability limitations
+
+AI model efficiency
+
+Database optimization
+
+Logging & error handling
+
+Threading / async handling (if applicable)
+
+Refactor where necessary to achieve:
+
+Clean architecture (Layered or Hexagonal preferred)
+
+High modularity
+
+Separation of concerns
+
+Scalable structure
+
+Production-level quality
+
+If major structural changes are needed, redesign the architecture and explain why.
+
+2️⃣ Smart & Efficient Algorithm Enhancement
+
+All detection, correlation, and analysis algorithms must be:
+
+Optimized for performance (O(n log n) or better where possible)
+
+Memory-efficient
+
+Scalable for large datasets (GB-scale logs, memory dumps, disk images)
+
+Designed for parallel processing if applicable
+
+Enhance AI/ML components by:
+
+Improving feature engineering
+
+Reducing false positives
+
+Improving anomaly detection logic
+
+Using adaptive thresholding
+
+Implementing risk scoring models
+
+Adding correlation intelligence (multi-source evidence linking)
+
+Where possible:
+
+Replace naive logic with probabilistic/statistical models
+
+Improve pattern recognition using smarter heuristics
+
+Add caching for repeated computations
+
+Optimize data indexing strategies
+
+The system should feel intelligent, not rule-based.
+
+3️⃣ UI/UX Professional Upgrade
+
+Redesign UI to meet enterprise cybersecurity tool standards.
+
+Requirements:
+
+Layout
+
+All tabs must be expandable and collapsible within the same main window
+
+No external popup windows
+
+No new system-level windows
+
+Use dynamic panels, drawers, or split-view layout instead
+
+Support resizable sections
+
+Navigation
+
+Smooth transitions
+
+Sidebar-based navigation
+
+Context-aware toolbars
+
+Clear forensic workflow (Ingest → Analyze → Correlate → Report)
+
+Flexibility
+
+Tabs must be extendable
+
+Components reusable
+
+Support modular plugin expansion
+
+Visual Quality
+
+Dark mode optimized for SOC environments
+
+Clear typography
+
+Clean data visualization
+
+Interactive graphs for attack timelines
+
+Expandable log viewers with smart filtering
+
+Make it look like:
+Enterprise SOC / SIEM / Forensics-grade software.
+
+4️⃣ Performance Optimization
+
+Ensure:
+
+Lazy loading for large data
+
+Efficient state management
+
+No UI freezing during analysis
+
+Async processing for heavy tasks
+
+Background worker model if necessary
+
+Improve:
+
+Memory handling
+
+Disk I/O
+
+Query speed
+
+Rendering performance
+
+5️⃣ Intelligence & Automation
+
+Upgrade the system to behave like an intelligent assistant.
+
+Add:
+
+Natural language querying of evidence
+
+Automated attack timeline reconstruction
+
+Suspicion scoring dashboard
+
+Smart anomaly explanation
+
+Auto-generated forensic summary
+
+The system should explain:
+
+Why something is suspicious
+
+What pattern triggered detection
+
+Risk level
+
+Suggested next step
+
+6️⃣ Security Hardening
+
+Harden the application by implementing:
+
+Secure file parsing
+
+Input validation
+
+Sandboxing for uploaded evidence
+
+Encrypted storage if applicable
+
+Proper authentication & authorization layers
+
+Secure API handling
+
+7️⃣ Code Quality
+
+Ensure:
+
+Clean, documented code
+
+Proper comments
+
+Clear naming conventions
+
+Modular structure
+
+Unit test coverage where possible
+
+No redundant code
+
+8️⃣ Final Deliverables
+
+Provide:
+
+Refactored architecture diagram (in text form)
+
+Summary of improvements made
+
+List of performance enhancements
+
+List of AI/algorithm upgrades
+
+UI structure redesign explanation
+
+Any recommendations for future scaling
+
+Do not make surface-level improvements.
+Think and act like a senior cybersecurity product architect building a real enterprise solution.

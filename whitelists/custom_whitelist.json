@@ -1,0 +1,21 @@
+{
+  "source": "custom",
+  "updated": "2025-11-25T20:24:02.091676",
+  "count": 1,
+  "entries": [
+    {
+      "hash_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "hash_md5": null,
+      "hash_sha1": null,
+      "filename": "notepad.exe",
+      "product_name": "Windows Notepad",
+      "vendor": "Microsoft Corporation",
+      "version": "",
+      "source": "custom",
+      "added_date": "2025-11-25T20:24:02.091676",
+      "added_by": "test_user",
+      "notes": "Known-good Windows binary",
+      "confidence": 1.0
+    }
+  ]
+}
