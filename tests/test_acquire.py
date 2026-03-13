@@ -11,7 +11,6 @@ import shutil
 import subprocess
 from unittest.mock import Mock, patch, MagicMock
 
-# Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modules.acquire import (
@@ -83,7 +82,6 @@ class TestDiskListing(unittest.TestCase):
         mock_system.return_value = 'Windows'
         mock_is_admin.return_value = True
 
-        # Mock WMIC output
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = (
@@ -110,7 +108,6 @@ class TestHashVerification(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
         self.test_file = os.path.join(self.test_dir, 'test.dat')
 
-        # Write test data
         with open(self.test_file, 'wb') as f:
             f.write(b'Hello, ForensAI!' * 1000)
 
@@ -122,19 +119,19 @@ class TestHashVerification(unittest.TestCase):
         """Test MD5 hash computation."""
         hash_value = verify_hash(self.test_file, 'md5')
         self.assertIsInstance(hash_value, str)
-        self.assertEqual(len(hash_value), 32)  # MD5 is 32 hex characters
+        self.assertEqual(len(hash_value), 32)
 
     def test_verify_hash_sha1(self):
         """Test SHA1 hash computation."""
         hash_value = verify_hash(self.test_file, 'sha1')
         self.assertIsInstance(hash_value, str)
-        self.assertEqual(len(hash_value), 40)  # SHA1 is 40 hex characters
+        self.assertEqual(len(hash_value), 40)
 
     def test_verify_hash_sha256(self):
         """Test SHA256 hash computation."""
         hash_value = verify_hash(self.test_file, 'sha256')
         self.assertIsInstance(hash_value, str)
-        self.assertEqual(len(hash_value), 64)  # SHA256 is 64 hex characters
+        self.assertEqual(len(hash_value), 64)
 
     def test_verify_hash_invalid_type(self):
         """Test that invalid hash type raises error."""
@@ -197,7 +194,6 @@ class TestSimulateAcquisition(unittest.TestCase):
         output_path = result['output_path']
         self.assertTrue(os.path.isfile(output_path))
 
-        # Verify file size
         file_size = os.path.getsize(output_path)
         self.assertEqual(file_size, 5 * 1024 * 1024)
 
@@ -229,7 +225,6 @@ class TestMetadataWriting(unittest.TestCase):
         self.assertTrue(os.path.exists(metadata_path))
         self.assertEqual(metadata_path, output_path + '.metadata.json')
 
-        # Read and verify content
         import json
         with open(metadata_path, 'r') as f:
             written_metadata = json.load(f)
@@ -257,7 +252,6 @@ class TestErrorMessages(unittest.TestCase):
 
     def test_known_error_codes(self):
         """Test that known error codes return proper messages."""
-        # Test common error codes
         msg_5 = get_windows_error_message(5)
         self.assertIn("Access is denied", msg_5)
         self.assertIn("Administrator", msg_5)
@@ -316,7 +310,7 @@ class TestDeviceOpenFallback(unittest.TestCase):
     @patch('modules.acquire.try_open_device')
     def test_fallback_first_attempt_succeeds(self, mock_try_open):
         """Test that first attempt succeeding returns immediately."""
-        mock_try_open.return_value = 12345  # Mock handle
+        mock_try_open.return_value = 12345
 
         handle, path, error = open_device_with_fallback(drive_number=0)
 
@@ -330,7 +324,7 @@ class TestDeviceOpenFallback(unittest.TestCase):
     def test_fallback_all_attempts_fail(self, mock_try_open, mock_get_error):
         """Test that all attempts failing returns error summary."""
         mock_try_open.return_value = None
-        mock_get_error.return_value = 5  # Access denied
+        mock_get_error.return_value = 5
 
         handle, path, error = open_device_with_fallback(drive_number=1)
 
@@ -343,7 +337,6 @@ class TestDeviceOpenFallback(unittest.TestCase):
     @patch('modules.acquire.try_open_device')
     def test_fallback_with_drive_letter_and_guid(self, mock_try_open, mock_get_guid):
         """Test fallback trying drive letter and volume GUID."""
-        # First attempt fails, second succeeds
         mock_try_open.side_effect = [None, 98765]
         mock_get_guid.return_value = "\\\\?\\Volume{test-guid}\\"
 
@@ -351,9 +344,7 @@ class TestDeviceOpenFallback(unittest.TestCase):
 
         self.assertIsNotNone(handle)
         self.assertEqual(handle, 98765)
-        # Should have tried both \\.\\E: and the GUID path
         self.assertEqual(mock_try_open.call_count, 2)
-        # Verify the GUID path was attempted
         self.assertIn("Volume{test-guid}", path)
 
 
@@ -431,7 +422,6 @@ class TestDryRunCheckDevice(unittest.TestCase):
         self.assertTrue(result['success'])
         self.assertTrue(result['can_acquire'])
         self.assertEqual(result['device_path'], "\\\\.\\PHYSICALDRIVE0")
-        # Size may or may not be available depending on mocking, but device opens successfully
 
 
 class TestMetadataFormat(unittest.TestCase):
@@ -468,12 +458,10 @@ class TestMetadataFormat(unittest.TestCase):
         metadata_path = write_metadata_json(output_path, metadata)
         self.assertTrue(os.path.exists(metadata_path))
 
-        # Read and verify
         import json
         with open(metadata_path, 'r') as f:
             written = json.load(f)
 
-        # Check required fields
         self.assertEqual(written['operator'], 'Test Operator')
         self.assertEqual(written['device'], '\\\\.\\PHYSICALDRIVE1')
         self.assertEqual(written['bytes_written'], 4001366016)
@@ -512,11 +500,9 @@ class TestMetadataFormat(unittest.TestCase):
 
 def run_tests():
     """Run all tests and return results."""
-    # Create test suite
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
 
-    # Add all test classes
     suite.addTests(loader.loadTestsFromTestCase(TestAdminCheck))
     suite.addTests(loader.loadTestsFromTestCase(TestDiskListing))
     suite.addTests(loader.loadTestsFromTestCase(TestHashVerification))
@@ -530,7 +516,6 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestDryRunCheckDevice))
     suite.addTests(loader.loadTestsFromTestCase(TestMetadataFormat))
 
-    # Run tests
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
 

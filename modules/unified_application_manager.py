@@ -13,7 +13,6 @@ from ctypes import cast, POINTER
 
 from PIL import Image, ImageQt
 
-# Enable AVIF image support if plugin is available
 try:
     import pillow_avif
 except ImportError:
@@ -28,12 +27,10 @@ from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtWidgets import (QToolBar, QMessageBox, QScrollArea, QLineEdit, QFileDialog)
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QSlider, QLabel, QHBoxLayout, QComboBox, \
     QSpacerItem, QSizePolicy
-# from comtypes import CLSCTX_ALL
 from fitz import open as fitz_open, Matrix
-# from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 import os
 
-if os.name == "nt":  # Windows
+if os.name == "nt":
     from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
     from comtypes import CLSCTX_ALL
 
@@ -44,32 +41,27 @@ class UnifiedViewer(QWidget):
 
         self.layout = QVBoxLayout(self)
 
-        # Initialize the viewers
         self.pdf_viewer = PDFViewer()
         self.picture_viewer = PictureViewer(self)
         self.audio_video_viewer = AudioVideoViewer(self)
         self.office_viewer = OfficeViewer(self)
 
-        # Add the viewers to the layout
         self.layout.addWidget(self.pdf_viewer)
         self.layout.addWidget(self.picture_viewer)
         self.layout.addWidget(self.audio_video_viewer)
         self.layout.addWidget(self.office_viewer)
 
-        # Hide all viewers initially
         self.pdf_viewer.hide()
         self.picture_viewer.hide()
         self.audio_video_viewer.hide()
         self.office_viewer.hide()
 
     def load(self, content, file_type="text", file_extension=".txt"):
-        # Clear all views first
         self.pdf_viewer.clear()
         self.picture_viewer.clear()
         self.audio_video_viewer.clear()
         self.office_viewer.clear()
 
-        # Hide all viewers first
         self.pdf_viewer.hide()
         self.picture_viewer.hide()
         self.audio_video_viewer.hide()
@@ -80,7 +72,6 @@ class UnifiedViewer(QWidget):
             self.picture_viewer.image_label.setText("No content available.")
             return
 
-        # Determine content type and show the appropriate viewer
         if file_type == "image":
             self.picture_viewer.show()
             self.picture_viewer.display(content)
@@ -104,13 +95,12 @@ class UnifiedViewer(QWidget):
 
             self.office_viewer.display(temp_file_path, file_extension)
         else:
-            # Unknown/unsupported file types - try to render as image (forensic files may lack extensions)
             self.picture_viewer.show()
             self.picture_viewer.display(content)
 
     def display_application_content(self, file_content, full_file_path):
         file_extension = os.path.splitext(full_file_path)[-1].lower()
-        file_type = "unknown"  # default to unknown instead of text
+        file_type = "unknown"
 
         image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff',
                             '.ico', '.webp', '.avif', '.svg', '.heic', '.heif']
@@ -129,7 +119,6 @@ class UnifiedViewer(QWidget):
         elif file_extension == '.pdf' or (file_content and file_content[:5] == b'%PDF-'):
             file_type = "pdf"
         else:
-            # For unknown extensions, try to detect by content magic bytes
             if file_content:
                 if file_content[:8] == b'\x89PNG\r\n\x1a\n':
                     file_type = "image"
@@ -154,8 +143,8 @@ class UnifiedViewer(QWidget):
 class PictureViewer(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.original_pixmap = None  # Store the original QPixmap
-        self.original_image_bytes = None  # Store the original image bytes
+        self.original_pixmap = None
+        self.original_image_bytes = None
         self.initialize_ui()
 
     def initialize_ui(self):
@@ -164,17 +153,14 @@ class PictureViewer(QWidget):
         self.layout.setSpacing(0)
         self.layout.setAlignment(Qt.AlignCenter)
 
-        # Create a container for the toolbar and the application viewer
         container_widget = QWidget(self)
 
         container_layout = QVBoxLayout()
-        container_layout.setContentsMargins(0, 0, 0, 0)  # Remove any margins
-        container_layout.setSpacing(0)  # Remove spacing between toolbar and viewer
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
 
-        # Create and set up the toolbar
         self.setup_toolbar()
 
-        # Add the toolbar to the container layout
         container_layout.addWidget(self.toolbar)
 
         self.image_label = QLabel(self)
@@ -194,7 +180,6 @@ class PictureViewer(QWidget):
     def setup_toolbar(self):
         self.toolbar = QToolBar(self)
         self.toolbar.setContentsMargins(0, 0, 0, 0)
-        # self.toolbar.setStyleSheet("QToolBar { background-color: lightgray; border: 0px solid gray; }")
 
         zoom_in_icon = QIcon("Icons/icons8-zoom-in-50.png")
         zoom_out_icon = QIcon("Icons/icons8-zoom-out-50.png")
@@ -217,7 +202,6 @@ class PictureViewer(QWidget):
         reset_action.triggered.connect(self.reset)
         self.export_action.triggered.connect(self.export_original_image)
 
-        # Add actions to the toolbar
         self.toolbar.addAction(zoom_in_action)
         self.toolbar.addAction(zoom_out_action)
         self.toolbar.addAction(rotate_left_action)
@@ -226,22 +210,19 @@ class PictureViewer(QWidget):
         self.toolbar.addAction(self.export_action)
 
     def display(self, content):
-        self.original_image_bytes = content  # Save the original image bytes
+        self.original_image_bytes = content
 
-        # First try Qt's native image loading (fast, but strict)
         qt_image = QImage.fromData(content)
 
         if qt_image.isNull():
-            # Qt failed - try PIL which is more forgiving with damaged images
             pixmap = self._load_with_pil(content)
         else:
             pixmap = QPixmap.fromImage(qt_image)
 
         if pixmap and not pixmap.isNull():
-            self.original_pixmap = pixmap.copy()  # Save the original pixmap
+            self.original_pixmap = pixmap.copy()
             self.image_label.setPixmap(pixmap)
         else:
-            # Show error message if both methods fail
             self.image_label.setText("Unable to display image\n(File may be severely corrupted)")
             self.original_pixmap = None
 
@@ -249,15 +230,11 @@ class PictureViewer(QWidget):
         """Load image using PIL - more forgiving with damaged/truncated images."""
         try:
             from PIL import ImageFile
-            # Enable loading of truncated images (critical for forensics)
             ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-            # Try to open with PIL
             pil_image = Image.open(io.BytesIO(content))
 
-            # Convert to RGB if necessary (handles various formats)
             if pil_image.mode in ('RGBA', 'LA', 'P'):
-                # Create white background for transparency
                 background = Image.new('RGB', pil_image.size, (255, 255, 255))
                 if pil_image.mode == 'P':
                     pil_image = pil_image.convert('RGBA')
@@ -266,11 +243,8 @@ class PictureViewer(QWidget):
             elif pil_image.mode != 'RGB':
                 pil_image = pil_image.convert('RGB')
 
-            # Force load the image data (this is where truncated images get partially loaded)
             pil_image.load()
 
-            # Convert PIL image to QPixmap
-            # Method 1: Use ImageQt (if available and working)
             try:
                 qt_image = ImageQt.ImageQt(pil_image)
                 pixmap = QPixmap.fromImage(qt_image)
@@ -279,7 +253,6 @@ class PictureViewer(QWidget):
             except Exception:
                 pass
 
-            # Method 2: Convert through bytes
             buffer = io.BytesIO()
             pil_image.save(buffer, format='PNG')
             buffer.seek(0)
@@ -324,16 +297,13 @@ class PictureViewer(QWidget):
             self.image_label.setPixmap(self.original_pixmap)
 
     def export_original_image(self):
-        # Ensure that an image is currently loaded
         if not self.original_image_bytes:
             QMessageBox.warning(self, "Export Error", "No image is currently loaded.")
             return
 
-        # Ask the user where to save the exported image
         file_name, _ = QFileDialog.getSaveFileName(self, "Export Image", "",
                                                    "PNG (*.png);;JPEG (*.jpg *.jpeg);;All Files (*)")
 
-        # If a location is chosen, save the image
         if file_name:
             with open(file_name, 'wb') as f:
                 f.write(self.original_image_bytes)
@@ -345,7 +315,7 @@ class PDFViewer(QWidget):
         super().__init__(parent)
         self.pdf = None
         self.current_page = 0
-        self.zoom_factor = 1.0  # Initialize the zoom factor here
+        self.zoom_factor = 1.0
         self.rotation_angle = 0
         self.is_panning = False
         self.pan_start_x = 0
@@ -357,25 +327,20 @@ class PDFViewer(QWidget):
             self.show_page(self.current_page)
 
     def initialize_ui(self):
-        # Set up the main layout
         self.layout = QVBoxLayout()
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
         self.layout.setAlignment(Qt.AlignCenter)
 
-        # Create a container for the toolbar and the application viewer
         container_widget = QWidget(self)
         container_layout = QVBoxLayout()
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(0)
 
-        # Create and set up the toolbar
         self.setup_toolbar()
 
-        # Add the toolbar to the container layout
         container_layout.addWidget(self.toolbar)
 
-        # Set up the PDF display area
         self.setup_pdf_display_area()
         container_layout.addWidget(self.scroll_area)
 
@@ -388,9 +353,7 @@ class PDFViewer(QWidget):
     def setup_toolbar(self):
         self.toolbar = QToolBar(self)
         self.toolbar.setContentsMargins(0, 0, 0, 0)
-        # self.toolbar.setStyleSheet("QToolBar { background-color: lightgray; border: 0px solid gray; }")
 
-        # Navigation buttons
         self.first_action = QAction(QIcon("Icons/icons8-thick-arrow-pointing-up-50.png"), "First", self)
         self.first_action.triggered.connect(self.show_first_page)
         self.toolbar.addAction(self.first_action)
@@ -399,18 +362,15 @@ class PDFViewer(QWidget):
         self.prev_action.triggered.connect(self.show_previous_page)
         self.toolbar.addAction(self.prev_action)
 
-        # Page entry
         self.page_entry = QLineEdit(self)
         self.page_entry.setMaximumWidth(60)
         self.page_entry.setAlignment(Qt.AlignRight)
         self.page_entry.returnPressed.connect(self.go_to_page)
         self.toolbar.addWidget(self.page_entry)
 
-        # Total pages label
         self.total_pages_label = QLabel(f"of {len(self.pdf)}" if self.pdf else "of 0")
         self.toolbar.addWidget(self.total_pages_label)
 
-        # Navigation buttons
         self.next_action = QAction(QIcon("Icons/icons8-right-arrow-50.png"), "Next", self)
         self.next_action.triggered.connect(self.show_next_page)
         self.toolbar.addAction(self.next_action)
@@ -419,19 +379,16 @@ class PDFViewer(QWidget):
         self.last_action.triggered.connect(self.show_last_page)
         self.toolbar.addAction(self.last_action)
 
-        # add separator
         self.toolbar.addSeparator()
 
-        # Zoom actions
         self.zoom_in_action = QAction(QIcon("Icons/icons8-zoom-in-50.png"), "Zoom In", self)
         self.zoom_in_action.triggered.connect(self.zoom_in)
         self.toolbar.addAction(self.zoom_in_action)
 
-        # QLineEdit for zoom percentage
         self.zoom_percentage_entry = QLineEdit(self)
-        self.zoom_percentage_entry.setFixedWidth(60)  # Set a fixed width for consistency
+        self.zoom_percentage_entry.setFixedWidth(60)
         self.zoom_percentage_entry.setAlignment(Qt.AlignRight)
-        self.zoom_percentage_entry.setPlaceholderText("100%")  # Default zoom is 100%
+        self.zoom_percentage_entry.setPlaceholderText("100%")
         self.zoom_percentage_entry.returnPressed.connect(self.set_zoom_from_entry)
         self.toolbar.addWidget(self.zoom_percentage_entry)
 
@@ -439,57 +396,46 @@ class PDFViewer(QWidget):
         self.zoom_out_action.triggered.connect(self.zoom_out)
         self.toolbar.addAction(self.zoom_out_action)
 
-        # Create a reset zoom button with its icon and add it to the toolbar
-        reset_zoom_icon = QIcon("Icons/icons8-zoom-to-actual-size-50.png")  # Replace with your icon path
+        reset_zoom_icon = QIcon("Icons/icons8-zoom-to-actual-size-50.png")
         self.reset_zoom_action = QAction(reset_zoom_icon, "Reset Zoom", self)
         self.reset_zoom_action.triggered.connect(self.reset_zoom)
         self.toolbar.addAction(self.reset_zoom_action)
 
-        # add separator
         self.toolbar.addSeparator()
 
-        # Fit in window
-        fit_window_icon = QIcon("Icons/icons8-enlarge-50.png")  # Replace with your icon path
+        fit_window_icon = QIcon("Icons/icons8-enlarge-50.png")
         self.fit_window_action = QAction(fit_window_icon, "Fit in Window", self)
         self.fit_window_action.triggered.connect(self.fit_window)
         self.toolbar.addAction(self.fit_window_action)
 
-        # Fit in width
-        fit_width_icon = QIcon("Icons/icons8-resize-horizontal-50.png")  # Replace with your icon path
+        fit_width_icon = QIcon("Icons/icons8-resize-horizontal-50.png")
         self.fit_width_action = QAction(fit_width_icon, "Fit in Width", self)
         self.fit_width_action.triggered.connect(self.fit_width)
         self.toolbar.addAction(self.fit_width_action)
 
-        # add separator
         self.toolbar.addSeparator()
 
-        # Rotate left
-        rotate_left_icon = QIcon("Icons/icons8-rotate-left-50.png")  # Replace with your icon path
+        rotate_left_icon = QIcon("Icons/icons8-rotate-left-50.png")
         self.rotate_left_action = QAction(rotate_left_icon, "Rotate Left", self)
         self.rotate_left_action.triggered.connect(self.rotate_left)
         self.toolbar.addAction(self.rotate_left_action)
 
-        # Rotate right
-        rotate_right_icon = QIcon("Icons/icons8-rotate-right-50.png")  # Replace with your icon path
+        rotate_right_icon = QIcon("Icons/icons8-rotate-right-50.png")
         self.rotate_right_action = QAction(rotate_right_icon, "Rotate Right", self)
         self.rotate_right_action.triggered.connect(self.rotate_right)
         self.toolbar.addAction(self.rotate_right_action)
 
-        # add separator
         self.toolbar.addSeparator()
 
-        # Pan tool button
-        self.pan_tool_icon = QIcon("Icons/icons8-drag-50.png")  # Replace with your pan icon path
+        self.pan_tool_icon = QIcon("Icons/icons8-drag-50.png")
         self.pan_tool_action = QAction(self.pan_tool_icon, "Pan Tool", self)
         self.pan_tool_action.setCheckable(True)
         self.pan_tool_action.toggled.connect(self.toggle_pan_mode)
         self.toolbar.addAction(self.pan_tool_action)
 
-        # add separator
         self.toolbar.addSeparator()
 
-        # Print button
-        self.print_icon = QIcon("Icons/icons8-print-50.png")  # Replace with your print icon path
+        self.print_icon = QIcon("Icons/icons8-print-50.png")
         self.print_action = QAction(self.print_icon, "Print", self)
         self.print_action.triggered.connect(self.print_pdf)
         self.toolbar.addAction(self.print_action)
@@ -516,7 +462,7 @@ class PDFViewer(QWidget):
 
     def go_to_page(self):
         try:
-            page_num = int(self.page_entry.text()) - 1  # Minus 1 because pages start from 0
+            page_num = int(self.page_entry.text()) - 1
             self.set_current_page(page_num)
         except ValueError:
             QMessageBox.warning(self, "Invalid Page Number", "Please enter a valid page number.")
@@ -582,7 +528,7 @@ class PDFViewer(QWidget):
         self.set_current_page(len(self.pdf) - 1)
 
     def zoom_in(self):
-        self.zoom_factor *= 1.2  # Assuming you have initialized zoom_factor as 1 in your __init__ method
+        self.zoom_factor *= 1.2
         self.update_zoom()
 
     def zoom_out(self):
@@ -590,7 +536,6 @@ class PDFViewer(QWidget):
         self.update_zoom()
 
     def update_zoom(self):
-        # Always zoom on the original high-quality image
         page = self.pdf[self.current_page]
         mat = Matrix(self.zoom_factor, self.zoom_factor)
         image = page.get_pixmap(matrix=mat)
@@ -602,11 +547,10 @@ class PDFViewer(QWidget):
 
     def set_zoom_from_entry(self):
         try:
-            # Extract the percentage from the QLineEdit
             percentage = float(self.zoom_percentage_entry.text().strip('%')) / 100
-            print(f"Entered Percentage: {percentage}")  # Debug print statement
+            print(f"Entered Percentage: {percentage}")
 
-            if 0.1 <= percentage <= 5:  # Just to ensure reasonable zoom limits, you can adjust these values
+            if 0.1 <= percentage <= 5:
                 self.zoom_factor = percentage
                 self.show_page(self.current_page)
             else:
@@ -641,35 +585,27 @@ class PDFViewer(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and self.pan_mode:
-            # Set the is_panning flag to True
             self.is_panning = True
-            # Store the initial mouse position
             self.pan_start_x = event.x()
             self.pan_start_y = event.y()
-            # Change the cursor to an open hand symbol
             self.setCursor(Qt.OpenHandCursor)
         event.accept()
 
     def mouseMoveEvent(self, event):
         if self.is_panning and self.pan_mode:
-            # Calculate the distance moved by the mouse
             dx = event.x() - self.pan_start_x
             dy = event.y() - self.pan_start_y
 
-            # Scroll the QScrollArea accordingly
             self.scroll_area.horizontalScrollBar().setValue(self.scroll_area.horizontalScrollBar().value() - dx)
             self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().value() - dy)
 
-            # Update the initial mouse position for the next mouse move event
             self.pan_start_x = event.x()
             self.pan_start_y = event.y()
         event.accept()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton and self.is_panning and self.pan_mode:
-            # Reset the is_panning flag
             self.is_panning = False
-            # Reset the cursor
             self.setCursor(Qt.ArrowCursor)
         event.accept()
 
@@ -700,7 +636,7 @@ class PDFViewer(QWidget):
 
             num_pages = len(self.pdf)
             for i in range(num_pages):
-                if i != 0:  # start a new page after the first one
+                if i != 0:
                     printer.newPage()
                 page = self.pdf[i]
                 image = page.get_pixmap()
@@ -725,13 +661,13 @@ class PDFViewer(QWidget):
                                                   options=options)
 
         if not filePath:
-            return  # user cancelled the dialog
+            return
 
         if not filePath.endswith(".pdf"):
             filePath += ".pdf"
 
         try:
-            self.pdf.save(filePath)  # save the PDF to the specified path
+            self.pdf.save(filePath)
             QMessageBox.information(self, "Success", "PDF saved successfully!")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save PDF: {e}")
@@ -741,14 +677,8 @@ class AudioVideoViewer(QWidget):
     def __init__(self, parent=None):
         super(AudioVideoViewer, self).__init__(parent)
 
-        # # Initialize the volumes control interface once
-        # devices = AudioUtilities.GetSpeakers()
-        # self.volume_interface = devices.Activate(
-        #     IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        # self.volume = cast(self.volume_interface, POINTER(IAudioEndpointVolume))
 
-        # Initialize the volumes control
-        if os.name == 'nt':  # Windows
+        if os.name == 'nt':
             devices = AudioUtilities.GetSpeakers()
             self.volume_interface = devices.Activate(
                 IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
@@ -765,10 +695,8 @@ class AudioVideoViewer(QWidget):
         self.layout.addWidget(self._video_widget)
         self._player.setVideoOutput(self._video_widget)
 
-        # Progress layout
         self.progress_layout = QHBoxLayout()
 
-        # Progress Slider
         self.progress_slider = QSlider(Qt.Horizontal, self)
         self.progress_slider.setToolTip("Progress")
         self.progress_slider.setRange(0, self._player.duration())
@@ -776,24 +704,18 @@ class AudioVideoViewer(QWidget):
         self.progress_slider.mousePressEvent = self.slider_clicked
         self.progress_layout.addWidget(self.progress_slider)
 
-        # Progress label
         self.progress_label = QLabel("00:00", self)
         self.progress_layout.addWidget(self.progress_label)
 
         self.layout.addLayout(self.progress_layout)
 
-        # Controls layout
         self.controls_layout = QHBoxLayout()
 
-        # Spacer to push media control buttons to the center
         self.controls_layout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
-        # If system is Windows, add a volume slider
         if os.name == 'nt':
-            # Volume label
             self.controls_layout.addWidget(QLabel("Volume"))
 
-            # Volume slider
             self.volume_slider = QSlider(Qt.Horizontal, self)
             self.volume_slider.setToolTip("Volume")
             self.volume_slider.setRange(0, 100)
@@ -803,17 +725,14 @@ class AudioVideoViewer(QWidget):
             self.volume_slider.valueChanged.connect(self.set_volume)
             self.controls_layout.addWidget(self.volume_slider)
 
-            # Volume display label
             self.volume_display = QLabel(f"{self.get_system_volume()}%", self)
             self.volume_display.setToolTip("Volume Percentage")
             self.controls_layout.addWidget(self.volume_display)
 
-        # Spacer to separate media controls and volumes controls
         self.controls_layout.addSpacerItem(QSpacerItem(370, 10, QSizePolicy.Fixed, QSizePolicy.Minimum))
 
         icon_size = QSize(24, 24)
 
-        # Media control buttons
         self.play_btn = QPushButton(self)
         self.play_btn.setToolTip("Play")
         self.play_btn.setIcon(QIcon("Icons/icons8-circled-play-50.png"))
@@ -835,13 +754,10 @@ class AudioVideoViewer(QWidget):
         self.stop_btn.clicked.connect(self._player.stop)
         self.controls_layout.addWidget(self.stop_btn)
 
-        # Spacer to separate volumes controls and speed controls
         self.controls_layout.addSpacerItem(QSpacerItem(370, 10, QSizePolicy.Fixed, QSizePolicy.Minimum))
 
-        # Speed label
         self.controls_layout.addWidget(QLabel("Speed"))
 
-        # Playback speed dropdown
         self.playback_speed_combo = QComboBox(self)
         self.playback_speed_combo.setToolTip("Playback Speed")
         speeds = ["0.25x", "0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "1.75x", "2.0x"]
@@ -850,7 +766,6 @@ class AudioVideoViewer(QWidget):
         self.playback_speed_combo.currentTextChanged.connect(self.change_playback_speed)
         self.controls_layout.addWidget(self.playback_speed_combo)
 
-        # Spacer to push speed controls to the right
         self.controls_layout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
         self.layout.addLayout(self.controls_layout)
@@ -863,7 +778,6 @@ class AudioVideoViewer(QWidget):
         self.playback_speed_combo.setCurrentText("1.0x")
         self._player.setPlaybackRate(1.0)
         self._player.setSource(QUrl.fromLocalFile(content))
-        # very_old# self._player.play()
 
     def update_position(self, position):
         self.progress_label.setText("{:02d}:{:02d}".format(position // 60000, (position // 1000) % 60))
@@ -877,7 +791,6 @@ class AudioVideoViewer(QWidget):
 
     def clear(self):
         self._player.stop()
-        # clear the thumbnail of the video or audio file
 
     def change_playback_speed(self, speed_text):
         speed = float(speed_text.replace("x", ""))
@@ -890,46 +803,30 @@ class AudioVideoViewer(QWidget):
         self._player.setPosition(position)
 
     def slider_clicked(self, event):
-        # Update the slider position when clicked
         new_value = int(event.x() / self.progress_slider.width() * self.progress_slider.maximum())
 
-        # Ensure the value is within range
         new_value = max(0, min(new_value, self.progress_slider.maximum()))
 
         self.progress_slider.setValue(new_value)
         self.set_media_position(new_value)
 
-    # def get_system_volume(self):
-    #     """Return the current system volumes as a value between 0 and 100."""
-    #     current_volume = self.volume.GetMasterVolumeLevelScalar()
-    #     return int(current_volume * 100)
-    #
-    # @Slot(int)
-    # def set_volume(self, value):
-    #     """Set the system volumes based on the slider's value."""
-    #     self.volume.SetMasterVolumeLevelScalar(value / 100.0, None)
-
-    # @Slot(int)
-    # def update_volume_display(self, value):
-    #     """Update the volumes display label based on the slider's value."""
-    #     self.volume_display.setText(f"{value}%")
 
     def get_system_volume(self):
         """Return the current system volume as a value between 0 and 100."""
-        if os.name == 'nt':  # Windows
+        if os.name == 'nt':
             current_volume = self.volume.GetMasterVolumeLevelScalar()
             return int(current_volume * 100)
 
     @Slot(int)
     def set_volume(self, value):
         """Set the system volume based on the slider's value."""
-        if os.name == 'nt':  # Windows
+        if os.name == 'nt':
             self.volume.SetMasterVolumeLevelScalar(value / 100.0, None)
 
     @Slot(int)
     def update_volume_display(self, value):
         """Update the volumes display label based on the slider's value."""
-        if os.name == 'nt':  # Only for Windows
+        if os.name == 'nt':
             self.volume_display.setText(f"{value}%")
 
     @Slot(int)
@@ -954,7 +851,6 @@ class OfficeViewer(QWidget):
     def initialize_ui(self):
         self.layout = QVBoxLayout(self)
 
-        # Create a simple UI with an "Open in Default App" button
         self.info_label = QLabel("Office document detected")
         self.info_label.setAlignment(Qt.AlignCenter)
 
@@ -965,7 +861,6 @@ class OfficeViewer(QWidget):
         self.open_button.clicked.connect(self.open_in_default_app)
         self.open_button.setEnabled(False)
 
-        # Add widgets to layout
         self.layout.addStretch()
         self.layout.addWidget(self.info_label)
         self.layout.addWidget(self.file_type_label)
@@ -976,7 +871,6 @@ class OfficeViewer(QWidget):
         """Display office file - saves temp file and allows opening with default app"""
         self.current_temp_file = file_path
 
-        # Map extensions to application names
         app_names = {
             '.docx': 'Microsoft Word',
             '.doc': 'Microsoft Word',
@@ -994,7 +888,6 @@ class OfficeViewer(QWidget):
         self.info_label.setText(f"Click below to open in {app_name}")
         self.open_button.setEnabled(True)
 
-        # Auto-open the file
         self.open_in_default_app()
 
     def open_in_default_app(self):

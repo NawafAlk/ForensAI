@@ -34,7 +34,6 @@ except ImportError:
     HAS_JINJA2 = False
 
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -71,7 +70,7 @@ class ChainOfCustodyEntry:
         self.target = target
         self.tools = tools
         self.hashes = hashes or {}
-        self.notes = notes or ''  # FIX #5: Add notes field
+        self.notes = notes or ''
         self.hostname = platform.node()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -85,14 +84,14 @@ class ChainOfCustodyEntry:
             'target': self.target,
             'tools': self.tools,
             'hashes': self.hashes,
-            'notes': self.notes  # FIX #5: Include notes in dict
+            'notes': self.notes
         }
 
 
 class HashVerifier:
     """Hash computation and verification for forensic evidence."""
 
-    BUFFER_SIZE = 8192 * 1024  # 8 MB buffer for efficiency
+    BUFFER_SIZE = 8192 * 1024
 
     @staticmethod
     def compute_hashes(file_path: str, algorithms: List[str] = None) -> Dict[str, str]:
@@ -187,10 +186,10 @@ class ArtifactInfo:
         self.extracted_path = None
         self.notable_reasons = []
         self.mime_type = None
-        self.priority = 0  # Higher = more important
-        self.origin = 'original'  # FIX #7: 'original', 'carved', 'partial'
-        self.confidence = 'high'  # FIX #7: 'high', 'medium', 'low'
-        self.thumbnail_path = None  # FIX #8: Path to thumbnail image
+        self.priority = 0
+        self.origin = 'original'
+        self.confidence = 'high'
+        self.thumbnail_path = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -209,9 +208,9 @@ class ArtifactInfo:
             'extracted_path': self.extracted_path,
             'notable_reasons': self.notable_reasons,
             'priority': self.priority,
-            'origin': self.origin,  # FIX #7
-            'confidence': self.confidence,  # FIX #7
-            'thumbnail_path': self.thumbnail_path  # FIX #8
+            'origin': self.origin,
+            'confidence': self.confidence,
+            'thumbnail_path': self.thumbnail_path
         }
 
 
@@ -232,7 +231,7 @@ class ProcessingStep:
     def complete(self, stdout: str = "", stderr: str = "", success: bool = True, error: str = None):
         """Mark step as complete."""
         self.end_time = datetime.now(timezone.utc)
-        self.stdout_snippet = stdout[:2000] if stdout else ""  # Limit snippet size
+        self.stdout_snippet = stdout[:2000] if stdout else ""
         self.stderr_snippet = stderr[:2000] if stderr else ""
         self.success = success
         self.error_message = error
@@ -282,14 +281,11 @@ class ForensicReportGenerator:
         self.checkpoints_dir = os.path.abspath(checkpoints_dir) if checkpoints_dir else None
         self.logfile = os.path.abspath(logfile) if logfile else None
 
-        # Report generation timestamp
         self.generated_at = datetime.now(timezone.utc)
         self.timestamp_str = self.generated_at.strftime("%Y%m%d_%H%M%S")
 
-        # Create output directory
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # Initialize data structures
         self.chain_of_custody: List[ChainOfCustodyEntry] = []
         self.processing_steps: List[ProcessingStep] = []
         self.artifacts: List[ArtifactInfo] = []
@@ -301,7 +297,6 @@ class ForensicReportGenerator:
         self.notes: str = ""
         self.risk_scan_results: List[Dict] = []
 
-        # Statistics
         self.stats = {
             'total_files': 0,
             'total_dirs': 0,
@@ -335,11 +330,9 @@ class ForensicReportGenerator:
                 if stage in stage_counts:
                     stage_counts[stage] += 1
 
-        # Top 10 indicators by score
         sorted_results = sorted(self.risk_scan_results, key=lambda r: r.get("score", 0), reverse=True)
         top_indicators = sorted_results[:10]
 
-        # Context-aware recommendations
         recommendations = self._generate_risk_recommendations(severity_counts, stage_counts)
 
         return {
@@ -395,7 +388,7 @@ class ForensicReportGenerator:
             target=target,
             tools=tools,
             hashes=hashes,
-            notes=notes  # FIX #5: Add notes parameter
+            notes=notes
         )
         self.chain_of_custody.append(entry)
         logger.info(f"Chain of custody: {action}")
@@ -418,10 +411,8 @@ class ForensicReportGenerator:
                 self.warnings.append(error_msg)
                 return False
 
-            # Compute hashes
             self.master_hashes = HashVerifier.compute_hashes(self.master_image)
 
-            # Add to chain of custody
             self.add_chain_of_custody_entry(
                 action="Master image hash verification",
                 source=self.master_image,
@@ -463,10 +454,8 @@ class ForensicReportGenerator:
                 self.warnings.append(error_msg)
                 return False
 
-            # Compute hashes
             self.derived_hashes = HashVerifier.compute_hashes(self.derived_iso)
 
-            # Add to chain of custody
             self.add_chain_of_custody_entry(
                 action="Derived ISO hash verification",
                 source=self.derived_iso,
@@ -490,14 +479,11 @@ class ForensicReportGenerator:
         """Collect versions of tools used in the forensic process."""
         logger.info("Collecting tool versions...")
 
-        # Python version
         self.tool_versions['python'] = sys.version.split()[0]
 
-        # Platform information
         self.tool_versions['platform'] = platform.platform()
         self.tool_versions['hostname'] = platform.node()
 
-        # ForensAI version (from git if available)
         try:
             result = subprocess.run(
                 ['git', 'rev-parse', 'HEAD'],
@@ -511,14 +497,12 @@ class ForensicReportGenerator:
         except Exception:
             self.tool_versions['forensai_commit'] = 'unknown'
 
-        # pytsk3 version
         if HAS_PYTSK3:
             try:
                 self.tool_versions['pytsk3'] = pytsk3.TSK_VERSION_STR
             except AttributeError:
                 self.tool_versions['pytsk3'] = 'installed (version unknown)'
 
-        # Check for external tools
         external_tools = {
             'bulk_extractor': ['bulk_extractor', '-V'],
             'dd': ['dd', '--version'],
@@ -533,9 +517,8 @@ class ForensicReportGenerator:
                     text=True,
                     timeout=5
                 )
-                # Extract version from output (first line usually)
                 version_line = result.stdout.split('\n')[0] if result.stdout else result.stderr.split('\n')[0]
-                self.tool_versions[tool_name] = version_line[:100]  # Limit length
+                self.tool_versions[tool_name] = version_line[:100]
             except Exception:
                 self.tool_versions[tool_name] = 'not found'
 
@@ -559,13 +542,11 @@ class ForensicReportGenerator:
                     file_path = os.path.join(root, filename)
 
                     try:
-                        # Get file stats
                         stat_info = os.stat(file_path)
                         file_size = stat_info.st_size
                         self.stats['total_size'] += file_size
                         self.stats['total_files'] += 1
 
-                        # Create artifact info
                         rel_path = os.path.relpath(file_path, self.parsed_artifacts_dir)
                         artifact = ArtifactInfo(
                             path=rel_path,
@@ -574,15 +555,12 @@ class ForensicReportGenerator:
                             artifact_type=self._categorize_file(filename)
                         )
 
-                        # Set timestamps
                         artifact.modified_utc = datetime.fromtimestamp(stat_info.st_mtime, timezone.utc)
                         artifact.created_utc = datetime.fromtimestamp(stat_info.st_ctime, timezone.utc)
                         artifact.extracted_path = file_path
 
-                        # Guess MIME type
                         artifact.mime_type, _ = mimetypes.guess_type(filename)
 
-                        # Check if notable (basic heuristics)
                         self._check_notable(artifact)
 
                         self.artifacts.append(artifact)
@@ -590,7 +568,6 @@ class ForensicReportGenerator:
                     except Exception as e:
                         logger.warning(f"Error processing {file_path}: {e}")
 
-            # Sort artifacts by priority (highest first)
             self.artifacts.sort(key=lambda x: x.priority, reverse=True)
 
             self.stats['notable_artifacts'] = sum(1 for a in self.artifacts if a.notable_reasons)
@@ -637,7 +614,6 @@ class ForensicReportGenerator:
         """Check if artifact is notable and assign priority."""
         filename_lower = artifact.name.lower()
 
-        # Suspicious keywords
         suspicious_keywords = [
             'password', 'passwd', 'credential', 'secret', 'key', 'private',
             'confidential', 'sensitive', 'ssn', 'credit', 'bank', 'malware',
@@ -649,24 +625,20 @@ class ForensicReportGenerator:
                 artifact.notable_reasons.append(f'filename_keyword:{keyword}')
                 artifact.priority += 50
 
-        # Executable files
         if artifact.artifact_type == 'executable':
             artifact.notable_reasons.append('executable')
             artifact.priority += 30
 
-        # Recently modified (within 30 days of scan)
         if artifact.modified_utc:
             days_old = (datetime.now(timezone.utc) - artifact.modified_utc).days
             if days_old <= 30:
                 artifact.notable_reasons.append(f'recent_modification:{days_old}d')
                 artifact.priority += 20
 
-        # Large files (> 100 MB)
         if artifact.size > 100 * 1024 * 1024:
             artifact.notable_reasons.append('large_file')
             artifact.priority += 10
 
-        # Specific file types of interest
         interesting_types = ['database', 'email', 'archive']
         if artifact.artifact_type in interesting_types:
             artifact.notable_reasons.append(f'type:{artifact.artifact_type}')
@@ -680,12 +652,11 @@ class ForensicReportGenerator:
 
         logger.info(f"Parsing bulk_extractor results from {self.bulk_extractor_dir}")
 
-        # Common bulk_extractor output files
         be_files = {
             'email': 'email.txt',
             'url': 'url.txt',
             'telephone': 'telephone.txt',
-            'ccn': 'ccn.txt',  # Credit card numbers
+            'ccn': 'ccn.txt',
             'exif': 'exif.txt',
             'zip': 'zip.txt'
         }
@@ -695,7 +666,6 @@ class ForensicReportGenerator:
             if os.path.exists(file_path):
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        # Count non-comment lines
                         count = sum(1 for line in f if line.strip() and not line.startswith('#'))
                     self.bulk_extractor_summary[key] = count
                     logger.info(f"bulk_extractor {key}: {count} items")
@@ -743,12 +713,11 @@ class ForensicReportGenerator:
             'processing_steps': [step.to_dict() for step in self.processing_steps],
             'chain_of_custody': [entry.to_dict() for entry in self.chain_of_custody],
             'tool_versions': self.tool_versions,
-            'files_produced': {},  # Will be filled after report generation
+            'files_produced': {},
             'warnings': self.warnings,
             'notes': self.notes
         }
 
-        # Save JSON manifest
         manifest_path = os.path.join(
             self.output_dir,
             f"{self.case_id}_evidence_manifest_{self.timestamp_str}.json"
@@ -774,7 +743,6 @@ class ForensicReportGenerator:
             f"{self.case_id}_artifacts_{self.timestamp_str}.csv"
         )
 
-        # CSV headers
         headers = [
             'Name', 'Size (bytes)', 'Type', 'Origin', 'Confidence', 'Priority',
             'Inode', 'SHA256', 'MD5', 'Created (UTC)', 'Modified (UTC)',
@@ -817,13 +785,10 @@ class ForensicReportGenerator:
         """
         logger.info("Generating HTML report...")
 
-        # Build report data
         report_data = self._build_report_data()
 
-        # Generate HTML using built-in template
         html_content = self._render_html_template(report_data)
 
-        # Save HTML report
         html_path = os.path.join(
             self.output_dir,
             f"{self.case_id}_evidence_report_{self.timestamp_str}.html"
@@ -837,7 +802,6 @@ class ForensicReportGenerator:
 
     def _build_report_data(self) -> Dict[str, Any]:
         """Build comprehensive report data dictionary."""
-        # Get master image info
         master_info = {}
         if self.master_image and os.path.exists(self.master_image):
             stat = os.stat(self.master_image)
@@ -848,7 +812,6 @@ class ForensicReportGenerator:
                 'modified': datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()
             }
 
-        # Get derived ISO info
         derived_info = {}
         if self.derived_iso and os.path.exists(self.derived_iso):
             stat = os.stat(self.derived_iso)
@@ -859,20 +822,15 @@ class ForensicReportGenerator:
                 'modified': datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()
             }
 
-        # Get top notable artifacts (limit to 20)
         notable_artifacts = [a for a in self.artifacts if a.notable_reasons][:20]
 
-        # File type distribution (FIX #1: Handle empty types properly)
         type_distribution = defaultdict(int)
         for artifact in self.artifacts:
-            # Get artifact type, default to 'unknown' if empty
             artifact_type = artifact.artifact_type if artifact.artifact_type else 'unknown'
-            # Normalize the type name
             if artifact_type.strip() == '':
                 artifact_type = 'unknown'
             type_distribution[artifact_type] += 1
 
-        # FIX #9: Identify missing tools
         missing_tools = []
         for tool, version in self.tool_versions.items():
             if 'not found' in version.lower() or 'unknown' in version.lower():
@@ -896,15 +854,14 @@ class ForensicReportGenerator:
             'type_distribution': dict(type_distribution),
             'bulk_extractor': self.bulk_extractor_summary,
             'warnings': self.warnings,
-            'artifacts_sample': [a.to_dict() for a in self.artifacts[:100]],  # First 100 for report
-            'missing_tools': missing_tools,  # FIX #9
-            'timestamp_str': self.timestamp_str,  # For download links
+            'artifacts_sample': [a.to_dict() for a in self.artifacts[:100]],
+            'missing_tools': missing_tools,
+            'timestamp_str': self.timestamp_str,
             'risk_summary': self._compute_risk_summary() if self.risk_scan_results else None
         }
 
     def _format_notable_reason(self, reason: str, artifact: Dict[str, Any]) -> str:
         """Format notable reason into human-readable text (FIX #3)."""
-        # Handle recent_modification:Xd
         if reason.startswith('recent_modification:'):
             days = reason.split(':')[1].replace('d', '')
             modified_time = artifact.get('modified_utc', 'unknown')
@@ -913,17 +870,14 @@ class ForensicReportGenerator:
             else:
                 return f"Modified {days} days ago (mtime: {modified_time})"
 
-        # Handle filename_keyword:keyword
         elif reason.startswith('filename_keyword:'):
             keyword = reason.split(':')[1]
             return f"Filename contains '{keyword}'"
 
-        # Handle type:typename
         elif reason.startswith('type:'):
             file_type = reason.split(':')[1]
             return f"File type: {file_type}"
 
-        # Handle other reasons
         elif reason == 'executable':
             return "Executable file (potential risk)"
         elif reason == 'large_file':
@@ -933,7 +887,6 @@ class ForensicReportGenerator:
 
     def _render_html_template(self, data: Dict[str, Any]) -> str:
         """Render HTML report from template data."""
-        # Since we may not have Jinja2 templates set up, create a basic HTML structure
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1100,7 +1053,6 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Executive Summary
         html += """
     <div class="section">
         <h2>1. Executive Summary</h2>
@@ -1135,7 +1087,6 @@ class ForensicReportGenerator:
             steps=len(data['processing_steps'])
         )
 
-        # Warnings section
         if data['warnings']:
             html += """
         <div class="warning">
@@ -1151,9 +1102,7 @@ class ForensicReportGenerator:
         html += """    </div>
 """
 
-        # Master Image & Verification Information (FIX #4: Enhanced)
         if data['master_image']:
-            # Determine verification status
             has_derived = data.get('derived_iso') and data.get('derived_hashes', {}).get('sha256')
             verification_status = "badge-success" if data['master_hashes'].get('sha256') else "badge-warning"
             verification_text = "✓ Verified" if data['master_hashes'].get('sha256') else "⚠ Not Verified"
@@ -1191,7 +1140,6 @@ class ForensicReportGenerator:
         </table>
 """
 
-            # Add Derived ISO section if present (FIX #4)
             if has_derived:
                 derived_sha256 = data['derived_hashes'].get('sha256', 'N/A')
                 derived_verified = "badge-success" if derived_sha256 != 'N/A' else "badge-warning"
@@ -1244,9 +1192,7 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Note: Derived ISO section has been moved to the combined Acquisition & Verification section above
 
-        # Chain of Custody (FIX #5: Now section 3)
         html += """
     <div class="section">
         <h2>3. Chain of Custody</h2>
@@ -1264,7 +1210,7 @@ class ForensicReportGenerator:
             <tbody>
 """
         for entry in data['chain_of_custody']:
-            timestamp = entry['timestamp_utc'][:19]  # Remove microseconds
+            timestamp = entry['timestamp_utc'][:19]
             tools = entry.get('tools', 'N/A')
             notes = entry.get('notes', '')
             html += f"""
@@ -1281,14 +1227,12 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Tool Versions (FIX #9: Enhanced with missing tools warning)
         html += """
     <div class="section">
         <h2>4. Tools & Versions</h2>
         <p>Software tools used in this forensic analysis:</p>
 """
 
-        # FIX #9: Show missing tools warning prominently
         if data.get('missing_tools'):
             html += f"""
         <div class="warning" style="margin-bottom: 20px;">
@@ -1296,7 +1240,6 @@ class ForensicReportGenerator:
             <p>The following forensic tools were not found on this system. Some analysis features may be limited:</p>
             <ul>
 """
-            # Installation instructions for common tools
             install_instructions = {
                 'dd': 'Install: <code>apt-get install coreutils</code> (Linux) or included in macOS',
                 'dc3dd': 'Install: <code>apt-get install dc3dd</code> (Linux)',
@@ -1335,7 +1278,6 @@ class ForensicReportGenerator:
             <tbody>
 """
         for tool, version in data['tool_versions'].items():
-            # Determine status badge
             if 'not found' in version.lower() or 'unknown' in version.lower():
                 status_badge = '<span class="badge badge-danger">Not Found</span>'
             else:
@@ -1353,7 +1295,6 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Processing Steps
         html += """
     <div class="section">
         <h2>5. Processing Steps</h2>
@@ -1389,7 +1330,6 @@ class ForensicReportGenerator:
         html += """    </div>
 """
 
-        # Artifacts Summary
         html += f"""
     <div class="section">
         <h2>6. Artifacts Summary</h2>
@@ -1420,11 +1360,9 @@ class ForensicReportGenerator:
             <tbody>
 """
         total = data['stats']['total_files']
-        # FIX #1: Properly display file types (even if empty, show as 'unknown')
         if data['type_distribution']:
             for ftype, count in sorted(data['type_distribution'].items(), key=lambda x: x[1], reverse=True):
                 pct = (count / total * 100) if total > 0 else 0
-                # Display type or 'unknown' if empty
                 display_type = ftype if ftype and ftype.strip() else 'unknown'
                 html += f"""
                 <tr>
@@ -1444,7 +1382,6 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Notable Findings (FIX #2, #3, #7, #8: Enhanced with origin, confidence, thumbnails)
         if data['notable_artifacts']:
             html += """
     <div class="section">
@@ -1468,31 +1405,24 @@ class ForensicReportGenerator:
             for artifact in data['notable_artifacts']:
                 size_kb = artifact['size_bytes'] / 1024
 
-                # FIX #3: Format reasons in human-readable format
                 formatted_reasons = []
                 for reason in artifact['notable_reasons']:
                     formatted_reason = self._format_notable_reason(reason, artifact)
                     formatted_reasons.append(formatted_reason)
                 reasons_text = '<br>'.join([f"• {r}" for r in formatted_reasons])
 
-                # FIX #2: Make artifact name clickable if extracted_path exists
                 artifact_name = artifact['name']
                 if artifact.get('extracted_path') and os.path.exists(artifact['extracted_path']):
-                    # Create clickable link to extracted file
                     name_html = f'<a href="file:///{artifact["extracted_path"]}" title="Open extracted file" style="color: #667eea; text-decoration: none;"><code>{artifact_name}</code></a>'
                 else:
-                    # Just display the name
                     name_html = f'<code>{artifact_name}</code>'
 
-                # Display type or 'unknown' if empty
                 artifact_type = artifact.get('type', 'unknown')
                 if not artifact_type or artifact_type.strip() == '':
                     artifact_type = 'unknown'
 
-                # FIX #8: Generate preview/thumbnail cell
                 preview_html = ""
                 if artifact.get('thumbnail_path') and os.path.exists(artifact['thumbnail_path']):
-                    # Show thumbnail if available
                     preview_html = f'<img src="{artifact["thumbnail_path"]}" alt="thumbnail" style="max-height: 40px; max-width: 60px; border: 1px solid #ddd; border-radius: 3px;" title="Preview">'
                 elif artifact_type in ['image', 'picture', 'photo']:
                     preview_html = '<span style="font-size: 24px;" title="Image file">🖼️</span>'
@@ -1507,18 +1437,15 @@ class ForensicReportGenerator:
                 else:
                     preview_html = '<span style="font-size: 20px; color: #999;" title="Generic file">📁</span>'
 
-                # FIX #7: Origin and Confidence badges
                 origin = artifact.get('origin', 'original')
                 confidence = artifact.get('confidence', 'high')
 
-                # Origin badge colors
                 origin_badge_class = {
                     'original': 'badge-success',
                     'carved': 'badge-warning',
                     'partial': 'badge-danger'
                 }.get(origin, 'badge-info')
 
-                # Confidence badge colors
                 confidence_badge_class = {
                     'high': 'badge-success',
                     'medium': 'badge-warning',
@@ -1547,7 +1474,6 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Risk Assessment Overview
         risk_summary = data.get('risk_summary')
         if risk_summary:
             sc = risk_summary['severity_counts']
@@ -1574,7 +1500,6 @@ class ForensicReportGenerator:
             </div>
         </div>
 """
-            # Top suspicious indicators table
             if risk_summary['top_indicators']:
                 html += """
         <h3>Top Suspicious Indicators</h3>
@@ -1616,7 +1541,6 @@ class ForensicReportGenerator:
             html += """    </div>
 """
 
-        # MITRE ATT&CK Mapping
         if risk_summary:
             active_stages = [(s, c) for s, c in risk_summary['stage_counts'].items() if c > 0]
             if active_stages:
@@ -1645,8 +1569,6 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Bulk Extractor Results
-        # Section number adjusts based on whether risk sections are present
         be_section = 10 if risk_summary else 8
         if data['bulk_extractor']:
             html += f"""
@@ -1676,13 +1598,11 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Recommendations
         rec_section = (11 if risk_summary else 9)
         html += f"""
     <div class="section">
         <h2>{rec_section}. Recommendations &amp; Next Steps</h2>
 """
-        # Context-aware recommendations from risk scan data
         if risk_summary and risk_summary.get('recommendations'):
             html += """        <h3>Risk-Based Recommendations:</h3>
         <ul>
@@ -1712,7 +1632,6 @@ class ForensicReportGenerator:
     </div>
 """
 
-        # Footer
         html += f"""
     <div class="footer">
         <p><strong>ForensAI Forensic Evidence Report</strong></p>
@@ -1746,7 +1665,6 @@ class ForensicReportGenerator:
             f"{self.case_id}_evidence_report_{self.timestamp_str}.pdf"
         )
 
-        # Try wkhtmltopdf first
         tools_to_try = [
             {
                 'name': 'wkhtmltopdf',
@@ -1762,7 +1680,6 @@ class ForensicReportGenerator:
 
         for tool in tools_to_try:
             try:
-                # Check if tool is available
                 check_result = subprocess.run(
                     tool['check'],
                     capture_output=True,
@@ -1772,7 +1689,6 @@ class ForensicReportGenerator:
                 if check_result.returncode == 0:
                     logger.info(f"Using {tool['name']} for PDF generation")
 
-                    # Generate PDF
                     result = subprocess.run(
                         tool['cmd'],
                         capture_output=True,
@@ -1793,7 +1709,6 @@ class ForensicReportGenerator:
                 logger.warning(f"Error with {tool['name']}: {e}")
                 continue
 
-        # If all tools failed, log instructions
         self.warnings.append(
             "PDF generation requires wkhtmltopdf or weasyprint. "
             "Install with: pip install weasyprint OR download wkhtmltopdf from https://wkhtmltopdf.org/"
@@ -1844,8 +1759,6 @@ class ForensicReportGenerator:
         logger.info(f"Starting report generation for case {self.case_id}")
         logger.info(f"Output formats: {', '.join(formats)}")
 
-        # FIX #5: Add comprehensive Chain of Custody entries
-        # Add acquisition entry (based on image file metadata if available)
         if self.master_image and os.path.exists(self.master_image):
             image_created_time = datetime.fromtimestamp(os.path.getctime(self.master_image), timezone.utc)
             self.add_chain_of_custody_entry(
@@ -1856,7 +1769,6 @@ class ForensicReportGenerator:
                 notes=f"Image file created at {image_created_time.strftime('%Y-%m-%d %H:%M:%S UTC')}"
             )
 
-        # Add analysis start entry
         self.add_chain_of_custody_entry(
             action="Forensic analysis initiated",
             source=self.master_image,
@@ -1865,7 +1777,6 @@ class ForensicReportGenerator:
         )
 
         try:
-            # Step 1: Verify master image
             if not self.verify_master_image():
                 return {
                     'status': 'failed',
@@ -1879,52 +1790,39 @@ class ForensicReportGenerator:
                     'warnings': self.warnings
                 }
 
-            # Step 2: Verify derived ISO (if present)
             self.verify_derived_iso()
 
-            # Step 3: Collect tool versions
             self.collect_tool_versions()
 
-            # Step 4: Scan artifacts (only if not already loaded from session)
             if len(self.artifacts) == 0:
-                # No artifacts loaded yet, scan from directory
                 self.scan_artifacts()
             else:
-                # Artifacts already loaded (from session data)
                 logger.info(f"Using {len(self.artifacts)} artifacts from session data (skipping scan)")
 
-            # Step 5: Parse bulk_extractor results
             self.parse_bulk_extractor_results()
 
-            # Step 6: Generate JSON manifest
             manifest_path = None
             if 'json' in formats:
                 manifest_path = self.generate_json_manifest()
 
-            # Step 6.5: Generate CSV artifacts file (FIX #6: Always generate for download links)
             csv_path = self.generate_csv_artifacts()
 
-            # Step 7: Generate HTML report
             html_path = None
             if 'html' in formats or 'pdf' in formats:
                 html_path = self.generate_html_report()
 
-            # Step 8: Generate PDF report (if requested)
             pdf_path = None
             if 'pdf' in formats and html_path:
                 pdf_path = self.generate_pdf_report(html_path)
 
-            # Step 9: Copy logfile
             log_copy_path = self.copy_logfile()
 
-            # FIX #5: Add report generation CoC entry
             self.add_chain_of_custody_entry(
                 action="Forensic report generated",
                 tools=f"ForensAI Report Generator, Formats: {', '.join(formats)}",
                 notes=f"Generated {len(formats)} report format(s): {', '.join(f.upper() for f in formats)}"
             )
 
-            # FIX #5: Add export/output CoC entry
             if html_path or manifest_path:
                 outputs = []
                 if html_path:
@@ -1940,7 +1838,6 @@ class ForensicReportGenerator:
                     notes=f"Exported files: {'; '.join(outputs)}"
                 )
 
-            # Build summary
             summary = (
                 f"Report generated successfully. "
                 f"Analyzed {self.stats['total_files']:,} files, "
@@ -1958,7 +1855,7 @@ class ForensicReportGenerator:
                 'report_pdf': pdf_path,
                 'report_html': html_path,
                 'manifest_json': manifest_path,
-                'artifacts_csv': csv_path,  # FIX #6: Include CSV path
+                'artifacts_csv': csv_path,
                 'logfile': log_copy_path,
                 'summary': summary,
                 'warnings': self.warnings
@@ -2021,11 +1918,9 @@ For detailed documentation, see: https://github.com/forensai/forensai
 
     args = parser.parse_args()
 
-    # Configure logging
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    # Create report generator
     generator = ForensicReportGenerator(
         case_id=args.case_id,
         operator=args.operator,
@@ -2038,16 +1933,13 @@ For detailed documentation, see: https://github.com/forensai/forensai
         logfile=args.logfile
     )
 
-    # Generate report
     result = generator.generate_report(
         formats=args.formats,
         include_screenshots=args.include_screenshots
     )
 
-    # Print result as JSON
     print(json.dumps(result, indent=2))
 
-    # Exit with appropriate code
     sys.exit(0 if result['status'] in ['success', 'partial'] else 1)
 
 

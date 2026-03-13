@@ -21,25 +21,25 @@ import re
 
 class FactType(Enum):
     """Type of forensic fact"""
-    DERIVED = "derived"      # Direct from evidence (timestamps, file size, hash)
-    INFERRED = "inferred"    # AI interpretation/speculation
-    COMPUTED = "computed"    # Calculated from data (entropy, fragmentation)
-    EXTERNAL = "external"    # From external sources (VirusTotal, NSRL)
+    DERIVED = "derived"
+    INFERRED = "inferred"
+    COMPUTED = "computed"
+    EXTERNAL = "external"
 
 
 class ConfidenceLevel(Enum):
     """Confidence level categories"""
-    VERY_HIGH = "very_high"  # 90-100%
-    HIGH = "high"            # 75-89%
-    MEDIUM = "medium"        # 50-74%
-    LOW = "low"              # 25-49%
-    VERY_LOW = "very_low"    # 0-24%
+    VERY_HIGH = "very_high"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    VERY_LOW = "very_low"
 
 
 @dataclass
 class ConfidenceScore:
     """Confidence score for a specific claim or finding"""
-    score: float  # 0.0 - 1.0
+    score: float
     level: ConfidenceLevel
     reasoning: str
     evidence: List[str] = field(default_factory=list)
@@ -83,11 +83,11 @@ class ForensicFact:
     description: str
     value: Any
     confidence: ConfidenceScore
-    source: str  # Where this fact came from
+    source: str
     timestamp: datetime
     artifact_id: str = ""
     artifact_name: str = ""
-    dependencies: List[str] = field(default_factory=list)  # IDs of facts this depends on
+    dependencies: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Export as dictionary"""
@@ -117,7 +117,7 @@ class UncertaintyIndicator:
                            "incomplete_recovery", "ai_speculation", "external_failure"]
     severity: Literal["critical", "high", "medium", "low"]
     description: str
-    mitigation: str  # What can be done about it
+    mitigation: str
     affected_artifacts: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -217,7 +217,6 @@ class ConfidenceTracker:
         if not facts:
             return ConfidenceScore.from_score(0.0, "No facts available")
 
-        # Weighted average with higher weight for derived facts
         weights = {
             FactType.DERIVED: 1.0,
             FactType.COMPUTED: 0.9,
@@ -235,7 +234,6 @@ class ConfidenceTracker:
 
         avg_confidence = weighted_sum / total_weight if total_weight > 0 else 0.0
 
-        # Count fact types
         derived_count = len([f for f in facts if f.fact_type == FactType.DERIVED])
         inferred_count = len([f for f in facts if f.fact_type == FactType.INFERRED])
 
@@ -254,7 +252,6 @@ class ConfidenceTracker:
             uncertainties = self.uncertainty_indicators
             overall = None
 
-        # Categorize facts
         derived = [f for f in facts if f.fact_type == FactType.DERIVED]
         inferred = [f for f in facts if f.fact_type == FactType.INFERRED]
         computed = [f for f in facts if f.fact_type == FactType.COMPUTED]
@@ -291,24 +288,19 @@ class ConfidenceTracker:
         """
         response_lower = ai_response.lower()
 
-        # High confidence indicators
         high_confidence = ["certainly", "definitely", "confirmed", "verified",
                           "clear evidence", "undoubtedly", "absolutely"]
 
-        # Medium confidence indicators
         medium_confidence = ["likely", "probably", "appears to be", "suggests",
                             "indicates", "seems to"]
 
-        # Low confidence indicators
         low_confidence = ["possibly", "maybe", "might", "could be", "uncertain",
                          "unclear", "speculation", "hypothesis"]
 
-        # Count occurrences
         high_count = sum(1 for phrase in high_confidence if phrase in response_lower)
         medium_count = sum(1 for phrase in medium_confidence if phrase in response_lower)
         low_count = sum(1 for phrase in low_confidence if phrase in response_lower)
 
-        # Calculate confidence score
         if high_count > low_count and high_count > 0:
             return 0.85
         elif medium_count > low_count:
@@ -316,11 +308,9 @@ class ConfidenceTracker:
         elif low_count > 0:
             return 0.35
         else:
-            # Default medium-high for factual-sounding responses
             return 0.70
 
 
-# Singleton pattern for easy access
 _confidence_trackers: Dict[str, ConfidenceTracker] = {}
 
 def get_confidence_tracker(case_id: str = "default") -> ConfidenceTracker:

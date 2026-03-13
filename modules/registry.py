@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetIte
 from Registry import Registry
 from Registry.Registry import RegistryValue, RegistryKey
 
-# Import AI service
 try:
     from managers.ai_service import get_ai_service
     from managers.notes_manager import get_notes_manager, Note
@@ -46,7 +45,6 @@ class AIRegistryExplanationThread(QThread):
             self.finished.emit(explanation)
         except Exception as e:
             self.error.emit(str(e))
-
 
 
 class RegistryExtractor(QWidget):
@@ -95,54 +93,44 @@ class RegistryExtractor(QWidget):
         self.loadHiveButton.clicked.connect(self.load_selected_hive)
         self.toolbar.addWidget(self.loadHiveButton)
 
-        # Splitter setup
         self.splitter = QSplitter(Qt.Horizontal)
         main_layout.addWidget(self.splitter)
 
-        # Tree Widget Setup
         self.treeWidget = QTreeWidget()
         self.treeWidget.header().hide()
         self.treeWidget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.treeWidget.customContextMenuRequested.connect(self.onTreeContextMenuRequested)
         self.splitter.addWidget(self.treeWidget)
 
-        # Details Panel and Table Setup
         self.detailsSplitter = QSplitter(Qt.Vertical)
         self.splitter.addWidget(self.detailsSplitter)
 
-        # Metadata Panel Setup
         self.metadataPanel = QTextEdit()
         self.metadataPanel.setReadOnly(True)
         self.detailsSplitter.addWidget(self.metadataPanel)
 
-        # Table Setup for displaying values
         self.tableWidget = QTableWidget()
         self.tableWidget.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tableWidget.setSelectionBehavior(QTableWidget.SelectRows)
         self.tableWidget.verticalHeader().setVisible(False)
         self.detailsSplitter.addWidget(self.tableWidget)
 
-        # Adjust proportions
-        self.splitter.setSizes([300, 700])  # Allocate space for the tree and details
-        self.detailsSplitter.setStretchFactor(0, 1)  # Metadata panel
-        self.detailsSplitter.setStretchFactor(1, 1)  # Table panel
+        self.splitter.setSizes([300, 700])
+        self.detailsSplitter.setStretchFactor(0, 1)
+        self.detailsSplitter.setStretchFactor(1, 1)
 
-        # Connect the click event
         self.treeWidget.itemClicked.connect(self.on_item_clicked)
 
     def onCustomContextMenuRequested(self, position):
-        # Create the context menu
         contextMenu = QMenu(self)
         copyAction = contextMenu.addAction("Copy")
 
-        # Execute the menu and check which action was triggered
         action = contextMenu.exec_(self.tableWidget.mapToGlobal(position))
 
         if action == copyAction:
-            # Copy the selected cell's text to the clipboard
             selectedIndexes = self.tableWidget.selectedIndexes()
             if selectedIndexes:
-                selectedText = selectedIndexes[0].data()  # Assuming single selection for simplicity
+                selectedText = selectedIndexes[0].data()
                 QApplication.clipboard().setText(selectedText)
 
     def onTreeContextMenuRequested(self, position):
@@ -155,15 +143,12 @@ class RegistryExtractor(QWidget):
         if not isinstance(registry_object, RegistryKey):
             return
 
-        # Create context menu
         menu = QMenu(self)
 
-        # Add AI Explain action if available
         if AI_AVAILABLE:
             explain_action = menu.addAction("AI Explain This Key")
             explain_action.triggered.connect(lambda: self.explain_registry_key(registry_object))
 
-        # Show menu
         menu.exec_(self.treeWidget.viewport().mapToGlobal(position))
 
     def explain_registry_key(self, registry_key):
@@ -172,7 +157,6 @@ class RegistryExtractor(QWidget):
             QMessageBox.warning(self, "AI Unavailable", "AI features are not available.")
             return
 
-        # Check AI service
         ai_service = get_ai_service()
         if not ai_service.is_available():
             QMessageBox.warning(
@@ -183,29 +167,25 @@ class RegistryExtractor(QWidget):
             )
             return
 
-        # Get key path and values
         key_path = registry_key.path()
 
-        # Convert values to list of dicts
         values_data = []
         try:
             for value in registry_key.values():
                 values_data.append({
                     'name': value.name(),
                     'type': value.value_type_str(),
-                    'data': str(value.value())[:100]  # Limit data length
+                    'data': str(value.value())[:100]
                 })
         except:
             values_data = []
 
-        # Show progress
         progress = QProgressDialog("Generating AI explanation...", None, 0, 0, self)
         progress.setWindowModality(Qt.WindowModal)
         progress.setWindowTitle("AI Analysis")
         progress.setCancelButton(None)
         progress.show()
 
-        # Start AI thread
         self.ai_thread = AIRegistryExplanationThread(key_path, values_data)
         self.ai_thread.finished.connect(lambda exp: self.show_registry_explanation(exp, progress, key_path))
         self.ai_thread.error.connect(lambda err: self.show_ai_error(err, progress))
@@ -215,7 +195,6 @@ class RegistryExtractor(QWidget):
         """Show AI explanation dialog for registry key."""
         progress_dialog.close()
 
-        # Create dialog
         dialog = QDialog(self)
         dialog.setWindowTitle("AI Registry Key Explanation")
         dialog.setMinimumWidth(600)
@@ -223,16 +202,14 @@ class RegistryExtractor(QWidget):
 
         layout = QVBoxLayout(dialog)
 
-        # Title
         title_label = QLabel(f"<b>Registry Key:</b> {key_path}")
         title_label.setWordWrap(True)
         title_label.setStyleSheet("font-size: 11pt; padding: 10px;")
         layout.addWidget(title_label)
 
-        # Explanation text
         explanation_text = QTextEdit()
         explanation_text.setPlainText(explanation)
-        explanation_text.setReadOnly(False)  # Allow editing
+        explanation_text.setReadOnly(False)
         explanation_text.setStyleSheet("""
             QTextEdit {
                 border: 1px solid #bdc3c7;
@@ -243,12 +220,10 @@ class RegistryExtractor(QWidget):
         """)
         layout.addWidget(explanation_text)
 
-        # Info label
         info_label = QLabel("You can edit this explanation before saving it as a note.")
         info_label.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 5px;")
         layout.addWidget(info_label)
 
-        # Buttons
         button_box = QDialogButtonBox()
         save_button = button_box.addButton("Save as Note", QDialogButtonBox.AcceptRole)
         save_button.setStyleSheet("""
@@ -285,7 +260,7 @@ class RegistryExtractor(QWidget):
             note = Note(
                 artifact_type='registry',
                 artifact_id=key_path,
-                artifact_name=key_path.split('\\')[-1],  # Last part of path
+                artifact_name=key_path.split('\\')[-1],
                 content=explanation,
                 ai_generated=True,
                 edited=True
@@ -322,7 +297,6 @@ class RegistryExtractor(QWidget):
         try:
             selectedHive = self.hiveSelector.currentText()
 
-            # Assuming get_partitions returns partitions where Windows is installed
             partitions = self.image_handler.get_partitions()
 
             if not partitions:
@@ -334,46 +308,43 @@ class RegistryExtractor(QWidget):
                 fs_type = self.image_handler.get_fs_type(start_offset)
                 fs_info = self.image_handler.get_fs_info(start_offset)
                 if fs_type == "NTFS":
-                    # Modify to only load the selected hive
                     hive_data = self.image_handler.get_registry_hive(fs_info,
                                                                      f"/Windows/System32/config/{selectedHive}")
                     if hive_data:
-                        # Temporarily save the hive data to a file and load it
                         with tempfile.NamedTemporaryFile(delete=False) as temp_hive:
                             temp_hive.write(hive_data)
                             temp_hive_path = temp_hive.name
 
-                        # Load the hive
                         with open(temp_hive_path, "rb") as hive_file:
                             reg = Registry.Registry(hive_file)
-                            self.display_registry_hive(selectedHive, reg.root())  # Display the selected hive
+                            self.display_registry_hive(selectedHive, reg.root())
 
                         os.remove(temp_hive_path)
         except Exception as e:
             print(f"An error occurred while loading the selected hive: {e}")
 
     def display_registry_hive(self, hive_name, root_key):
-        self.treeWidget.clear()  # Clear the tree before displaying a new hive
+        self.treeWidget.clear()
         hive_item = QTreeWidgetItem(self.treeWidget, [hive_name])
         hive_item.setIcon(0, self.hive_icon)
         hive_item.setData(0, Qt.UserRole, root_key)
         self.display_registry_keys(hive_item, root_key)
 
     def display_registry_keys(self, parent_item, registry_key):
-        subkeys = registry_key.subkeys()  # Call the method once and store the result
-        items = [QTreeWidgetItem(parent_item, [subkey.name()]) for subkey in subkeys]  # Use list comprehension
+        subkeys = registry_key.subkeys()
+        items = [QTreeWidgetItem(parent_item, [subkey.name()]) for subkey in subkeys]
         for item, subkey in zip(items, subkeys):
-            item.setData(0, Qt.UserRole, subkey)  # Store the key object for later retrieval
+            item.setData(0, Qt.UserRole, subkey)
             item.setIcon(0, self.key_icon)
             self.display_registry_keys(item, subkey)
             self.display_registry_values(item, subkey)
 
     def display_registry_values(self, parent_key_item, registry_key):
-        values = registry_key.values()  # Call the method once and store the result
+        values = registry_key.values()
         items = [QTreeWidgetItem(parent_key_item, [value.name() or "(Default)"]) for value in
-                 values]  # Use list comprehension
+                 values]
         for item, value in zip(items, values):
-            item.setData(0, Qt.UserRole, value)  # Store the value object for later retrieval
+            item.setData(0, Qt.UserRole, value)
             item.setIcon(0, self.value_icon)
 
     def display_metadata(self, registry_object):
@@ -384,7 +355,6 @@ class RegistryExtractor(QWidget):
             "Last Modified": registry_object.timestamp().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
-        # Start with an HTML structure for styling
         details = '<html><head/><body>'
         details += '<p style="font-size:14px; font-family: Courier New; "><b>Metadata Information</b></p>'
 
@@ -396,24 +366,20 @@ class RegistryExtractor(QWidget):
         self.metadataPanel.setHtml(details)
 
     def setup_table(self, values):
-        # Reset and set up table
         self.tableWidget.clear()
         self.tableWidget.setRowCount(len(values))
         self.tableWidget.setColumnCount(3)
         self.tableWidget.setHorizontalHeaderLabels(["Name", "Type", "Value"])
 
-        # Set initial widths to balance out based on common sizes
-        self.tableWidget.setColumnWidth(0, 150)  # Name
-        self.tableWidget.setColumnWidth(1, 150)  # Type
-        self.tableWidget.setColumnWidth(2, 450)  # Value
+        self.tableWidget.setColumnWidth(0, 150)
+        self.tableWidget.setColumnWidth(1, 150)
+        self.tableWidget.setColumnWidth(2, 450)
 
-        # Set dynamic resizing behavior
         header = self.tableWidget.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)  # Name column to stretch based on content
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Type column adjusts to fit the content
-        header.setSectionResizeMode(2, QHeaderView.Stretch)  # Value column stretches with window resize
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
 
-        # Populate table rows
         for i, value in enumerate(values):
             self.tableWidget.setItem(i, 0, QTableWidgetItem(value.name()))
             self.tableWidget.setItem(i, 1, QTableWidgetItem(str(value.value_type_str())))
@@ -432,7 +398,6 @@ class RegistryExtractor(QWidget):
         elif isinstance(registry_object, RegistryValue):
             self.setup_table([registry_object])
 
-    # clear the window
     def clear(self):
         self.treeWidget.clear()
         self.metadataPanel.clear()

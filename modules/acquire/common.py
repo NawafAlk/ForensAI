@@ -102,7 +102,7 @@ def verify_hash(file_path: str, hash_type: str = 'md5') -> str:
     try:
         with open(file_path, 'rb') as f:
             while True:
-                chunk = f.read(1024 * 1024)  # 1MB chunks
+                chunk = f.read(1024 * 1024)
                 if not chunk:
                     break
                 hasher.update(chunk)
@@ -129,7 +129,6 @@ def write_metadata_json(
     """
     metadata_path = output_path + '.metadata.json'
 
-    # Add ForensAI tool information
     metadata['tool'] = 'ForensAI'
     metadata['tool_version'] = '1.0.0'
     metadata['acquisition_host'] = platform.node()
@@ -187,19 +186,16 @@ def simulate_acquisition(
     timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
     output_path = os.path.join(output_dir, f"image_{timestamp}.dd")
 
-    # Initialize hashers
     hashers = create_hashers(compute_hashes)
 
     start_time = time.time()
 
-    # Write dummy data
     with open(output_path, 'wb') as f:
-        chunk_size = 1024 * 1024  # 1MB
+        chunk_size = 1024 * 1024
         total_written = 0
         target_size = size_mb * 1024 * 1024
 
         while total_written < target_size:
-            # Create deterministic "random" data for testing
             chunk = bytes([(total_written + i) % 256 for i in range(min(chunk_size, target_size - total_written))])
             f.write(chunk)
 
@@ -253,7 +249,6 @@ def acquire_with_ewfacquire(
     Raises:
         AcquisitionError: If ewfacquire is not available or acquisition fails
     """
-    # Check if ewfacquire is available
     try:
         result = subprocess.run(['ewfacquire', '-V'], capture_output=True, timeout=5)
         if result.returncode != 0:
@@ -265,34 +260,29 @@ def acquire_with_ewfacquire(
             "Windows: Download from https://github.com/libyal/libewf"
         )
 
-    # Determine device path based on platform
     if platform.system() == 'Windows':
         if isinstance(drive_number, int):
             device_path = f"\\\\.\\PHYSICALDRIVE{drive_number}"
         else:
             device_path = str(drive_number)
     else:
-        # Linux
         if isinstance(drive_number, int):
-            # Assume sdX naming for integer input
             device_path = f"/dev/sd{chr(ord('a') + drive_number)}"
         elif str(drive_number).startswith('/dev/'):
             device_path = str(drive_number)
         else:
             device_path = f"/dev/{drive_number}"
 
-    # Prepare ewfacquire command
     cmd = [
         'ewfacquire',
         '-t', output_path,
-        '-u',  # Unattended mode
+        '-u',
         device_path
     ]
 
     start_time = time.time()
 
     try:
-        # Run ewfacquire
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -300,15 +290,12 @@ def acquire_with_ewfacquire(
             text=True
         )
 
-        # Monitor progress
         for line in process.stdout:
             if abort_check and abort_check():
                 process.terminate()
                 raise AcquisitionError("Acquisition aborted by user")
 
-            # Parse progress from ewfacquire output if possible
             if progress_callback:
-                # ewfacquire output parsing would go here
                 pass
 
         process.wait()
@@ -368,13 +355,11 @@ class ProgressTracker:
         elapsed = current_time - self.start_time
         speed_mbps = (bytes_processed / (1024 * 1024)) / elapsed if elapsed > 0 else 0
 
-        # Calculate percentage if total is known
         if self.total_size and self.total_size > 0:
             percent = (bytes_processed / self.total_size) * 100
         else:
             percent = None
 
-        # Calculate ETA
         if self.total_size and speed_mbps > 0:
             remaining_bytes = self.total_size - bytes_processed
             eta_seconds = remaining_bytes / (speed_mbps * 1024 * 1024)

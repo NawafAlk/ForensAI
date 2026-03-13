@@ -30,53 +30,41 @@ class VeriphoneWidget(QWidget):
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(0, 0, 0, 0)
 
-        # set widget size but make it resizable
         self.setFixedSize(600, 400)
 
-        # set window title
         self.setWindowTitle("Veriphone Phone Number Verification")
 
-        # add icon to the window
         self.setWindowIcon(QIcon('Icons/logo.ico'))
 
-        # Toolbar setup
         self.toolbar = QToolBar("Veriphone Toolbar", self)
         self.toolbar.setContentsMargins(0, 0, 0, 0)
         self.toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.layout.addWidget(self.toolbar)
 
-        # Phone input field
         self.phone_input = QLineEdit(self)
-        # size of the input field
         self.phone_input.setFixedSize(300, 30)
         self.phone_input.setPlaceholderText("Enter phone number with country code")
         self.toolbar.addWidget(self.phone_input)
-        # Connect returnPressed signal to verify_phone_number method
         self.phone_input.returnPressed.connect(self.verify_phone_number)
 
-        # spacer
         spacer = QWidget(self)
         spacer.setFixedSize(10, 10)
         self.toolbar.addWidget(spacer)
 
-        # Verify button in toolbar
         verify_button = QPushButton("Verify", self)
         verify_button.clicked.connect(self.verify_phone_number)
         self.toolbar.addWidget(verify_button)
 
-        # Spacer widget to push the logo to the far right
         spacer = QWidget(self)
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
 
-        # Logo on the far right
         self.logo_label = QLabel(self)
-        self.logo_pixmap = QPixmap("Icons/logo_veriphone.png")  # Make sure the path is correct
+        self.logo_pixmap = QPixmap("Icons/logo_veriphone.png")
         self.logo_label.setPixmap(self.logo_pixmap.scaled(120, 70, Qt.KeepAspectRatio,
-                                                          Qt.SmoothTransformation))  # Adjust 100x50 to your desired size
+                                                          Qt.SmoothTransformation))
         self.toolbar.addWidget(self.logo_label)
 
-        # Text browser for showing the results
         self.info_text_edit = QTextBrowser(self)
         self.info_text_edit.setReadOnly(True)
         self.layout.addWidget(self.info_text_edit)
@@ -117,7 +105,6 @@ class VeriphoneWidget(QWidget):
             return {"status": "error", "message": "Failed to verify phone number."}
 
     def format_data_as_html(self, data):
-        # Additional fields from the Veriphone API
         phone_region = data.get('phone_region', 'N/A')
         country = data.get('country', 'N/A')
         country_code = data.get('country_code', 'N/A')

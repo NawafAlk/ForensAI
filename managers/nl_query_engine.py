@@ -64,7 +64,6 @@ class NLQueryEngine:
     Uses the Groq AI API for NL understanding and caches results for performance.
     """
 
-    # Common forensic query suggestions for autocomplete
     SUGGESTION_TEMPLATES = [
         "show me executables",
         "show me all .exe files",
@@ -115,7 +114,6 @@ class NLQueryEngine:
         "zip and rar archives",
     ]
 
-    # Schema description used in AI prompts
     FILE_SCHEMA = {
         "name": "Filename including extension (e.g., 'document.pdf', 'svchost.exe')",
         "size": "File size in bytes (integer)",
@@ -126,7 +124,6 @@ class NLQueryEngine:
         "path": "Full file path within the disk image (e.g., '/Users/john/Documents/report.pdf')",
     }
 
-    # Valid fields and operators for validation
     VALID_FIELDS = {"name", "size", "type", "created", "modified", "accessed", "path"}
     VALID_OPERATORS = {"contains", "equals", "gt", "lt", "gte", "lte", "regex", "in",
                        "startswith", "endswith"}
@@ -175,11 +172,9 @@ class NLQueryEngine:
 
         normalized = query.strip().lower()
 
-        # Check cache first
         if normalized in self._cache:
             return self._cache[normalized]
 
-        # Ensure AI service is available
         if self.ai_service is None or not self.ai_service.api_key:
             return QueryResult(
                 predicates=[],
@@ -188,7 +183,6 @@ class NLQueryEngine:
                 original_query=query
             )
 
-        # Build prompt and query Groq
         prompt = self._build_prompt(query)
 
         try:
@@ -202,7 +196,6 @@ class NLQueryEngine:
 
             result = self._parse_response(response, query)
 
-            # Cache the result (evict oldest if at capacity)
             if len(self._cache) >= self._cache_maxsize:
                 oldest_key = next(iter(self._cache))
                 del self._cache[oldest_key]
@@ -257,7 +250,6 @@ class NLQueryEngine:
             List of matching suggestion strings (up to 10).
         """
         if not partial or not partial.strip():
-            # Return a selection of popular suggestions
             return self.SUGGESTION_TEMPLATES[:10]
 
         partial_lower = partial.strip().lower()
@@ -271,7 +263,6 @@ class NLQueryEngine:
             elif partial_lower in suggestion_lower:
                 substring_matches.append(suggestion)
 
-        # Also check individual words in the partial query
         partial_words = partial_lower.split()
         if len(partial_words) > 1:
             for suggestion in self.SUGGESTION_TEMPLATES:
@@ -382,7 +373,6 @@ Notes:
         Returns:
             QueryResult with parsed predicates, or a fallback result on parse failure.
         """
-        # Handle error responses from the AI service
         if response.startswith("Error:"):
             return QueryResult(
                 predicates=[],
@@ -392,10 +382,8 @@ Notes:
             )
 
         try:
-            # Try to extract JSON from the response (may be wrapped in markdown code blocks)
             json_str = response.strip()
 
-            # Remove markdown code fences if present
             if "```json" in json_str:
                 json_str = json_str.split("```json", 1)[1]
                 json_str = json_str.split("```", 1)[0]
@@ -403,14 +391,12 @@ Notes:
                 json_str = json_str.split("```", 1)[1]
                 json_str = json_str.split("```", 1)[0]
 
-            # Try to find a JSON object in the response
             json_match = re.search(r'\{[\s\S]*\}', json_str)
             if json_match:
                 json_str = json_match.group()
 
             data = json.loads(json_str)
 
-            # Parse predicates
             predicates = []
             raw_predicates = data.get("predicates", [])
             for pred_data in raw_predicates:
@@ -419,7 +405,6 @@ Notes:
                 value = pred_data.get("value")
                 negate = bool(pred_data.get("negate", False))
 
-                # Validate field and operator
                 if field_name not in self.VALID_FIELDS:
                     continue
                 if operator not in self.VALID_OPERATORS:
@@ -494,7 +479,6 @@ Notes:
         target = predicate.value
 
         try:
-            # --- String operations ---
             if op == "contains":
                 return str(target).lower() in str(field_value).lower()
 
@@ -518,7 +502,6 @@ Notes:
                     return any(field_lower == str(t).lower() for t in target)
                 return False
 
-            # --- Numeric / date comparisons ---
             elif op in ("gt", "lt", "gte", "lte"):
                 return self._compare_values(field_value, target, op)
 
@@ -541,7 +524,6 @@ Notes:
         Returns:
             True if the comparison holds, False otherwise.
         """
-        # Try numeric comparison first
         try:
             num_field = self._to_number(field_value)
             num_target = self._to_number(target)
@@ -557,7 +539,6 @@ Notes:
         except (ValueError, TypeError):
             pass
 
-        # Try date comparison
         try:
             date_field = self._to_datetime(field_value)
             date_target = self._to_datetime(target)
@@ -573,7 +554,6 @@ Notes:
         except (ValueError, TypeError):
             pass
 
-        # Fallback: string comparison
         try:
             str_field = str(field_value).lower()
             str_target = str(target).lower()
@@ -627,7 +607,6 @@ Notes:
         if not isinstance(value, str):
             return None
 
-        # Try common ISO 8601 formats
         formats = [
             "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%dT%H:%M:%S.%f",
@@ -648,9 +627,6 @@ Notes:
         self._cache.clear()
 
 
-# ---------------------------------------------------------------------------
-# Module-level singleton
-# ---------------------------------------------------------------------------
 _nl_query_engine: Optional[NLQueryEngine] = None
 
 

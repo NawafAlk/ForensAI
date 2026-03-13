@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 ForensAI - Command Line Acquisition Tool
 Provides cross-platform CLI interface for physical disk acquisition.
@@ -12,7 +11,6 @@ import json
 import platform
 from datetime import datetime
 
-# Add parent directory to path to import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modules.acquire import (
@@ -28,7 +26,6 @@ from modules.acquire import (
 )
 import logging
 
-# Detect platform for platform-specific messages
 IS_WINDOWS = platform.system() == 'Windows'
 IS_LINUX = platform.system() == 'Linux'
 
@@ -161,7 +158,6 @@ def acquire_command(args):
         print(get_privilege_message() + "\n")
         return 1
 
-    # Parse hash types
     hash_types = []
     if args.md5:
         hash_types.append('md5')
@@ -174,7 +170,6 @@ def acquire_command(args):
         print("\nERROR: Please specify at least one hash type (--md5, --sha1, or --sha256)\n")
         return 1
 
-    # Determine device path
     device_path = None
     device_description = ""
     confirmation_token = ""
@@ -182,7 +177,6 @@ def acquire_command(args):
     if hasattr(args, 'device') and args.device:
         device_path = args.device
         device_description = device_path
-        # Generate confirmation token
         basename = os.path.basename(device_path.replace('\\', '/').rstrip(':'))
         confirmation_token = f"CONFIRM {basename.upper()}"
 
@@ -199,7 +193,6 @@ def acquire_command(args):
             device_description = f"\\\\.\\PHYSICALDRIVE{args.drive}"
             confirmation_token = f"CONFIRM PHYSICALDRIVE{args.drive}"
         else:
-            # Linux: assume sdX if integer
             device_path = f"/dev/sd{chr(ord('a') + args.drive)}"
             device_description = device_path
             confirmation_token = f"CONFIRM {os.path.basename(device_path).upper()}"
@@ -211,7 +204,6 @@ def acquire_command(args):
             print("\nERROR: Must specify --drive or --device\n")
         return 1
 
-    # Try to get disk information for display
     disk_info = None
     try:
         disks = list_physical_disks()
@@ -230,7 +222,6 @@ def acquire_command(args):
         print(f"\nWARNING: Could not enumerate disks: {str(e)}")
         print("Proceeding anyway...\n")
 
-    # Display acquisition details
     print(f"\nDevice: {device_description}")
     if disk_info:
         print(f"Model:  {disk_info.model}")
@@ -246,7 +237,6 @@ def acquire_command(args):
 
     print("\n" + "=" * 80)
 
-    # Require confirmation
     print(f"\nWARNING: This will image the entire device!")
     print(f"To proceed, type exactly: {confirmation_token}\n")
 
@@ -263,7 +253,6 @@ def acquire_command(args):
         print("\nAcquisition cancelled.\n")
         return 1
 
-    # Prepare metadata
     metadata = {
         'operator': args.operator,
         'notes': args.notes or '',
@@ -277,7 +266,6 @@ def acquire_command(args):
             'source_size_bytes': disk_info.size
         })
 
-    # Setup logger
     logger = logging.getLogger('forensai.acquire')
     logger.setLevel(logging.DEBUG if hasattr(args, 'verbose') and args.verbose else logging.INFO)
     if not logger.handlers:
@@ -286,10 +274,8 @@ def acquire_command(args):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    # Get chunk size
     chunk_size = args.chunk if hasattr(args, 'chunk') and args.chunk else (4 * 1024 * 1024)
 
-    # Progress callback
     last_progress = [0]
 
     def progress_callback(bytes_read, total_bytes, speed_mbps):
@@ -313,7 +299,6 @@ def acquire_command(args):
     print("Starting acquisition...")
     print("=" * 80 + "\n")
 
-    # Safety notes
     print("SAFETY NOTES:")
     if IS_WINDOWS:
         print("  - Close cloud sync applications (Dropbox, OneDrive, etc.)")
@@ -337,7 +322,6 @@ def acquire_command(args):
                 buffer_size=chunk_size,
                 max_bytes=args.max_bytes if hasattr(args, 'max_bytes') else None
             )
-            # Convert to dict for compatibility
             result = acq_result.to_dict()
         elif args.format == 'e01':
             print("\nERROR: E01 format requires ewfacquire to be installed\n")
@@ -363,7 +347,6 @@ def acquire_command(args):
             for hash_type, hash_value in result['hashes'].items():
                 print(f"  {hash_type.upper():6s}: {hash_value}")
 
-        # Prepare metadata for JSON
         metadata_for_json = {
             'operator': metadata['operator'],
             'notes': metadata['notes'],
@@ -381,7 +364,6 @@ def acquire_command(args):
         if 'error' in result:
             metadata_for_json['error'] = result['error']
 
-        # Write metadata
         metadata_path = write_metadata_json(result['output_path'], metadata_for_json)
         print(f"\nMetadata:    {metadata_path}")
 
@@ -446,7 +428,6 @@ def dry_run_device_check(args):
         print(get_privilege_message() + "\n")
         return 1
 
-    # Determine device path
     device_path = None
     device_description = ""
 
@@ -499,7 +480,6 @@ def dry_run_simulation(args):
     print("ForensAI - Dry Run Simulation")
     print("=" * 80)
 
-    # Parse hash types
     hash_types = []
     if args.md5:
         hash_types.append('md5')
@@ -587,7 +567,6 @@ def dry_run_simulation(args):
 
 def main():
     """Main entry point."""
-    # Platform-specific examples
     if IS_WINDOWS:
         examples = """
 Examples (Windows):
@@ -646,16 +625,12 @@ NOTE: Files are written directly to .dd (no temp file) for crash safety with flu
 
     subparsers = parser.add_subparsers(dest='command', help='Command to execute')
 
-    # List physical disks command
     subparsers.add_parser('list', help='List available physical disks')
 
-    # List partitions command
     subparsers.add_parser('list-logical', help='List available partitions/volumes')
 
-    # Acquire command
     acquire_parser = subparsers.add_parser('acquire', help='Acquire a physical disk')
 
-    # Device selection
     device_group = acquire_parser.add_mutually_exclusive_group(required=True)
     device_group.add_argument('--drive', type=int,
                               help='Drive index (Windows: PHYSICALDRIVE#, Linux: sd[a+#])')
@@ -686,7 +661,6 @@ NOTE: Files are written directly to .dd (no temp file) for crash safety with flu
     acquire_parser.add_argument('--verbose', action='store_true',
                                 help='Enable verbose logging')
 
-    # Dry-run device check
     dry_run_parser = subparsers.add_parser('dry-run', help='Check device access without writing')
     dry_run_device_group = dry_run_parser.add_mutually_exclusive_group(required=True)
     dry_run_device_group.add_argument('--drive', type=int,
@@ -699,7 +673,6 @@ NOTE: Files are written directly to .dd (no temp file) for crash safety with flu
     dry_run_parser.add_argument('--verbose', action='store_true',
                                 help='Enable verbose logging')
 
-    # Simulation command
     sim_parser = subparsers.add_parser('simulate', help='Create simulated acquisition files')
     sim_parser.add_argument('--output', required=True,
                             help='Output directory for simulated files')

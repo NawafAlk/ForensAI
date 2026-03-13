@@ -72,36 +72,29 @@ class CaseAuditTab(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        # Header
         header = self._create_header()
         layout.addWidget(header)
 
-        # Main content splitter
         splitter = QSplitter(Qt.Vertical)
 
-        # Top: Statistics and Media Info
         top_widget = QWidget()
         top_layout = QHBoxLayout(top_widget)
         top_layout.setSpacing(10)
 
-        # Statistics card
         self.stats_card = self._create_statistics_card()
         top_layout.addWidget(self.stats_card)
 
-        # Media detection card
         self.media_card = self._create_media_card()
         top_layout.addWidget(self.media_card)
 
         splitter.addWidget(top_widget)
 
-        # Bottom: Audit log browser
         audit_widget = self._create_audit_browser()
         splitter.addWidget(audit_widget)
 
         splitter.setSizes([300, 400])
         layout.addWidget(splitter)
 
-        # Bottom action bar
         action_bar = self._create_action_bar()
         layout.addWidget(action_bar)
 
@@ -121,7 +114,6 @@ class CaseAuditTab(QWidget):
 
         layout.addStretch()
 
-        # Case ID label
         self.case_label = QLabel(f"Case ID: {self.case_id}")
         self.case_label.setObjectName("caseLabel")
         layout.addWidget(self.case_label)
@@ -136,7 +128,6 @@ class CaseAuditTab(QWidget):
         layout = QVBoxLayout(card)
         layout.setSpacing(5)
 
-        # Placeholder stats (will be updated when data loads)
         self.stat_files = QLabel("Files Analyzed: <b>0</b>")
         self.stat_flagged = QLabel("High Risk Artifacts: <b>0</b>")
         self.stat_ai = QLabel("AI Explanations: <b>0</b>")
@@ -174,7 +165,6 @@ class CaseAuditTab(QWidget):
 
         layout = QVBoxLayout(widget)
 
-        # Filter bar
         filter_bar = QHBoxLayout()
 
         filter_label = QLabel("Filter:")
@@ -191,14 +181,12 @@ class CaseAuditTab(QWidget):
 
         filter_bar.addStretch()
 
-        # Refresh button
         refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self.load_audit_logs)
         filter_bar.addWidget(refresh_btn)
 
         layout.addLayout(filter_bar)
 
-        # Audit log tree
         self.audit_tree = QTreeWidget()
         self.audit_tree.setHeaderLabels(['Timestamp', 'Type', 'Artifact', 'Details'])
         self.audit_tree.setColumnWidth(0, 180)
@@ -220,25 +208,21 @@ class CaseAuditTab(QWidget):
 
         layout.addStretch()
 
-        # Verify Integrity button
         verify_btn = QPushButton("Verify Integrity")
         verify_btn.setObjectName("successButton")
         verify_btn.clicked.connect(self.verify_integrity)
         layout.addWidget(verify_btn)
 
-        # Export JSON button
         export_json_btn = QPushButton("Export Logs (JSON)")
         export_json_btn.setObjectName("primaryButton")
         export_json_btn.clicked.connect(lambda: self.export_logs("json"))
         layout.addWidget(export_json_btn)
 
-        # Export CSV button
         export_csv_btn = QPushButton("Export Logs (CSV)")
         export_csv_btn.setObjectName("primaryButton")
         export_csv_btn.clicked.connect(lambda: self.export_logs("csv"))
         layout.addWidget(export_csv_btn)
 
-        # View Media Report button
         media_report_btn = QPushButton("View Media Report")
         media_report_btn.setObjectName("primaryButton")
         media_report_btn.clicked.connect(self.view_media_report)
@@ -250,7 +234,6 @@ class CaseAuditTab(QWidget):
         """Set image handler and load media info."""
         self.image_handler = image_handler
 
-        # Load media information
         try:
             self.media_info = detect_media(image_handler)
             self._update_media_card()
@@ -259,10 +242,8 @@ class CaseAuditTab(QWidget):
                 f"<p style='color: #e74c3c;'>Media detection failed: {str(e)}</p>"
             )
 
-        # Load audit logs
         self.load_audit_logs()
 
-        # Update statistics
         self.update_statistics()
 
     def _update_media_card(self):
@@ -285,7 +266,6 @@ class CaseAuditTab(QWidget):
         size_gb = self.media_info.total_size_bytes / (1024**3)
         html += f"<p><span class='label'>Capacity:</span> {size_gb:.2f} GB</p>"
 
-        # TRIM status
         if self.media_info.trim_enabled:
             conf = self.media_info.trim_confidence * 100
             html += f"<p class='warning'>TRIM: ENABLED ({conf:.0f}% confidence)</p>"
@@ -293,7 +273,6 @@ class CaseAuditTab(QWidget):
         else:
             html += f"<p class='ok'>TRIM: Not detected</p>"
 
-        # Acquisition info
         if self.media_info.acquisition_tool:
             html += f"<p><span class='label'>Tool:</span> {self.media_info.acquisition_tool}</p>"
 
@@ -310,13 +289,10 @@ class CaseAuditTab(QWidget):
         try:
             audit_logger = get_audit_logger(case_id=self.case_id)
 
-            # Clear tree
             self.audit_tree.clear()
 
-            # Load all logs
             self.all_logs = []
 
-            # Load rule logs
             if audit_logger.rule_log_path.exists():
                 with open(audit_logger.rule_log_path, 'r', encoding='utf-8') as f:
                     for line in f:
@@ -324,7 +300,6 @@ class CaseAuditTab(QWidget):
                         log['_type'] = 'rule_firing'
                         self.all_logs.append(log)
 
-            # Load AI logs
             if audit_logger.ai_log_path.exists():
                 with open(audit_logger.ai_log_path, 'r', encoding='utf-8') as f:
                     for line in f:
@@ -332,10 +307,8 @@ class CaseAuditTab(QWidget):
                         log['_type'] = 'ai_interaction'
                         self.all_logs.append(log)
 
-            # Sort by timestamp
             self.all_logs.sort(key=lambda x: x['timestamp'], reverse=True)
 
-            # Apply current filter
             self.apply_filter()
 
         except Exception as e:
@@ -352,28 +325,22 @@ class CaseAuditTab(QWidget):
         filter_type = self.filter_combo.currentText()
 
         for log in self.all_logs:
-            # Apply filter
             if filter_type == "Rule Firings Only" and log['_type'] != 'rule_firing':
                 continue
             if filter_type == "AI Interactions Only" and log['_type'] != 'ai_interaction':
                 continue
 
-            # Add to tree
             item = QTreeWidgetItem(self.audit_tree)
 
-            # Timestamp
             timestamp = log['timestamp'].replace('T', ' ').replace('Z', '')
             item.setText(0, timestamp)
 
-            # Type
             log_type = "Rule Firing" if log['_type'] == 'rule_firing' else "AI Interaction"
             item.setText(1, log_type)
 
-            # Artifact
             artifact_name = log.get('artifact_name', 'N/A')
             item.setText(2, artifact_name)
 
-            # Details
             if log['_type'] == 'rule_firing':
                 details = f"Score: {log['final_score']}/100 ({log['severity']})"
             else:
@@ -381,7 +348,6 @@ class CaseAuditTab(QWidget):
 
             item.setText(3, details)
 
-            # Store full log
             item.setData(0, Qt.UserRole, log)
 
     def show_log_details(self, item, column):
@@ -391,7 +357,6 @@ class CaseAuditTab(QWidget):
         if not log:
             return
 
-        # Format log as HTML
         html = "<style>"
         html += "body { font-family: monospace; font-size: 11px; }"
         html += "h3 { color: #2c3e50; }"
@@ -401,7 +366,6 @@ class CaseAuditTab(QWidget):
 
         html += f"<h3>{log['_type'].replace('_', ' ').title()}</h3>"
 
-        # Format as JSON
         log_copy = dict(log)
         log_copy.pop('_type', None)
 
@@ -409,7 +373,6 @@ class CaseAuditTab(QWidget):
         html += json.dumps(log_copy, indent=2)
         html += "</pre>"
 
-        # Show in dialog
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextBrowser, QPushButton
 
         dialog = QDialog(self)
@@ -433,13 +396,11 @@ class CaseAuditTab(QWidget):
         try:
             audit_logger = get_audit_logger(case_id=self.case_id)
 
-            # Count rule logs
             rule_count = 0
             if audit_logger.rule_log_path.exists():
                 with open(audit_logger.rule_log_path, 'r') as f:
                     rule_count = sum(1 for _ in f)
 
-            # Count AI logs
             ai_count = 0
             if audit_logger.ai_log_path.exists():
                 with open(audit_logger.ai_log_path, 'r') as f:
@@ -447,26 +408,20 @@ class CaseAuditTab(QWidget):
 
             total_logs = rule_count + ai_count
 
-            # Update labels
             self.stat_logs.setText(f"Audit Entries: <b>{total_logs:,}</b>")
             self.stat_ai.setText(f"AI Explanations: <b>{ai_count:,}</b>")
 
-            # These would be updated from actual case data
-            # self.stat_files.setText(f"Files Analyzed: <b>{files_count:,}</b>")
-            # self.stat_flagged.setText(f"High Risk Artifacts: <b>{flagged_count:,}</b>")
 
         except Exception as e:
             pass
 
     def verify_integrity(self):
         """Verify cryptographic integrity of audit chain."""
-        # Show progress
         progress = QProgressDialog("Verifying audit chain integrity...", None, 0, 0, self)
         progress.setWindowModality(Qt.WindowModal)
         progress.setCancelButton(None)
         progress.show()
 
-        # Start verification thread
         self.integrity_thread = IntegrityCheckThread(self.case_id)
         self.integrity_thread.finished.connect(lambda r: self._show_integrity_results(r, progress))
         self.integrity_thread.error.connect(lambda e: self._show_integrity_error(e, progress))
@@ -476,7 +431,6 @@ class CaseAuditTab(QWidget):
         """Show integrity verification results."""
         progress_dialog.close()
 
-        # Update status label with hash
         if results['all_valid']:
             hash_display = results.get('final_hash_short', '')
             if hash_display:
@@ -492,7 +446,6 @@ class CaseAuditTab(QWidget):
                 "Chain Integrity: <b style='color: #e74c3c;'>✗ INVALID</b>"
             )
 
-        # Show detailed results
         msg = "Integrity Verification Results\n\n"
 
         msg += f"Rule Logs: {'VALID' if results['rule_logs']['valid'] else 'INVALID'}\n"
@@ -503,7 +456,6 @@ class CaseAuditTab(QWidget):
         msg += f"  Entries: {results['ai_logs']['entries']}\n"
         msg += f"  {results['ai_logs']['message']}\n\n"
 
-        # Add final hash to message
         if 'final_hash' in results:
             msg += f"Chain Hash (SHA256):\n{results['final_hash']}\n\n"
 
@@ -528,7 +480,6 @@ class CaseAuditTab(QWidget):
         try:
             audit_logger = get_audit_logger(case_id=self.case_id)
 
-            # Ask for save location
             ext = "json" if format_type == "json" else "csv"
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
@@ -538,7 +489,6 @@ class CaseAuditTab(QWidget):
             )
 
             if file_path:
-                # Export
                 result_path = audit_logger.export_logs(
                     output_format=format_type,
                     output_path=file_path
@@ -563,7 +513,6 @@ class CaseAuditTab(QWidget):
             QMessageBox.warning(self, "No Media", "No media information available.")
             return
 
-        # Generate detailed report
         report = self.media_info.export_report()
 
         html = "<style>"
@@ -587,7 +536,6 @@ class CaseAuditTab(QWidget):
         html += f"<p><span class='label'>Sectors:</span> {report['total_sectors']:,}</p>"
         html += "</div>"
 
-        # TRIM
         if report['trim_enabled']:
             html += "<div class='section'>"
             html += f"<p class='warning'>TRIM STATUS: ENABLED</p>"
@@ -595,7 +543,6 @@ class CaseAuditTab(QWidget):
             html += f"<p class='warning'>Recovery Probability: LOW</p>"
             html += "</div>"
 
-        # Acquisition
         if report.get('acquisition_tool'):
             html += "<div class='section'>"
             html += "<h3>Acquisition Details</h3>"
@@ -611,7 +558,6 @@ class CaseAuditTab(QWidget):
 
             html += "</div>"
 
-        # Warnings
         if report.get('warning_flags'):
             html += "<div class='section'>"
             html += "<h3>Warnings</h3>"
@@ -621,7 +567,6 @@ class CaseAuditTab(QWidget):
             html += "</ul>"
             html += "</div>"
 
-        # Show in dialog
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextBrowser, QPushButton
 
         dialog = QDialog(self)
@@ -647,7 +592,6 @@ class CaseAuditTab(QWidget):
         self.media_info = None
         self.all_logs = []
 
-        # Reset stats
         self.stat_files.setText("Files Analyzed: <b>0</b>")
         self.stat_flagged.setText("High Risk Artifacts: <b>0</b>")
         self.stat_ai.setText("AI Explanations: <b>0</b>")

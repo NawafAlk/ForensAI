@@ -29,17 +29,17 @@ import threading
 class VTResult:
     """VirusTotal scan result"""
     hash_sha256: str
-    detection_ratio: str  # "5/70" format
-    positives: int  # Number of engines detecting as malicious
-    total: int  # Total engines scanned
+    detection_ratio: str
+    positives: int
+    total: int
     scan_date: str
     permalink: str
     vendors_detected: List[str] = field(default_factory=list)
     is_malicious: bool = False
     is_suspicious: bool = False
     is_clean: bool = False
-    reputation_score: float = 0.0  # 0.0 (malicious) to 1.0 (clean)
-    confidence: float = 0.0  # Confidence in the result
+    reputation_score: float = 0.0
+    confidence: float = 0.0
     error: Optional[str] = None
 
     def get_verdict(self) -> str:
@@ -59,7 +59,6 @@ class VTResult:
 class VirusTotalChecker:
     """VirusTotal API integration for file reputation checking"""
 
-    # Trusted AV vendors (higher weight in reputation calculation)
     TRUSTED_VENDORS = {
         'Microsoft', 'Kaspersky', 'Symantec', 'McAfee', 'ESET', 'Bitdefender',
         'Avast', 'AVG', 'Trend Micro', 'F-Secure', 'Sophos', 'CrowdStrike'
@@ -78,12 +77,10 @@ class VirusTotalChecker:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Rate limiting (free tier: 4 requests/minute)
-        self.rate_limit_delay = 15.0  # seconds between requests
+        self.rate_limit_delay = 15.0
         self.last_request_time = 0.0
         self.request_lock = threading.Lock()
 
-        # Statistics
         self.stats = {
             "cache_hits": 0,
             "api_calls": 0,
@@ -112,13 +109,11 @@ class VirusTotalChecker:
                 error="VirusTotal API key not configured"
             )
 
-        # Check cache first
         cached = self._get_cached_result(file_hash)
         if cached:
             self.stats["cache_hits"] += 1
             return cached
 
-        # Rate limiting
         with self.request_lock:
             time_since_last = time.time() - self.last_request_time
             if time_since_last < self.rate_limit_delay:
@@ -126,7 +121,6 @@ class VirusTotalChecker:
                 print(f"[VT] Rate limiting: sleeping {sleep_time:.1f}s")
                 time.sleep(sleep_time)
 
-            # Make API request
             try:
                 params = {
                     'apikey': self.api_key,
@@ -144,7 +138,6 @@ class VirusTotalChecker:
                     return result
 
                 elif response.status_code == 204:
-                    # Rate limit exceeded
                     self.stats["errors"] += 1
                     return VTResult(
                         hash_sha256=file_hash,
@@ -209,7 +202,6 @@ class VirusTotalChecker:
         response_code = data.get('response_code', 0)
 
         if response_code == 0:
-            # Hash not found in VT database
             return VTResult(
                 hash_sha256=file_hash,
                 detection_ratio="0/0",
@@ -220,30 +212,25 @@ class VirusTotalChecker:
                 error="File not found in VirusTotal database"
             )
 
-        # Extract data
         positives = data.get('positives', 0)
         total = data.get('total', 0)
         scan_date = data.get('scan_date', '')
         permalink = data.get('permalink', '')
         scans = data.get('scans', {})
 
-        # Get vendors that detected as malicious
         vendors_detected = [
             vendor for vendor, result in scans.items()
             if result.get('detected', False)
         ]
 
-        # Calculate reputation score
         reputation_score = self._calculate_reputation(positives, total, vendors_detected)
 
-        # Calculate confidence based on number of engines
-        confidence = min(1.0, total / 70.0)  # 70 is typical max engines
+        confidence = min(1.0, total / 70.0)
 
-        # Determine classification
         detection_rate = positives / total if total > 0 else 0
-        is_malicious = detection_rate >= 0.3  # 30% or more detect as malicious
-        is_suspicious = 0.05 < detection_rate < 0.3  # 5-30% detection
-        is_clean = detection_rate <= 0.05  # 5% or less (likely false positives)
+        is_malicious = detection_rate >= 0.3
+        is_suspicious = 0.05 < detection_rate < 0.3
+        is_clean = detection_rate <= 0.05
 
         return VTResult(
             hash_sha256=file_hash,
@@ -267,20 +254,16 @@ class VirusTotalChecker:
         Gives higher weight to trusted vendors.
         """
         if total == 0:
-            return 0.5  # Unknown
+            return 0.5
 
-        # Basic detection rate
         detection_rate = positives / total
 
-        # Check if trusted vendors detected it
         trusted_detections = sum(1 for v in vendors if v in self.TRUSTED_VENDORS)
         trusted_count = sum(1 for v in self.TRUSTED_VENDORS)
 
-        # If multiple trusted vendors flag it, increase malicious score
         if trusted_detections >= 3:
             detection_rate = min(1.0, detection_rate * 1.5)
 
-        # Convert to reputation (invert detection rate)
         reputation = 1.0 - detection_rate
 
         return max(0.0, min(1.0, reputation))
@@ -296,12 +279,10 @@ class VirusTotalChecker:
             with open(cache_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # Check if cache is expired (7 days)
             cached_time = datetime.fromisoformat(data.get('cached_at', ''))
             if datetime.now() - cached_time > timedelta(days=7):
                 return None
 
-            # Reconstruct VTResult
             result_data = data.get('result', {})
             return VTResult(**result_data)
 
@@ -336,15 +317,12 @@ class VirusTotalChecker:
         Returns:
             VTResult or None if no hashes available
         """
-        # Try SHA256 first (best)
         if 'sha256' in file_data and file_data['sha256']:
             return self.check_hash(file_data['sha256'], 'sha256')
 
-        # Try SHA1
         if 'sha1' in file_data and file_data['sha1']:
             return self.check_hash(file_data['sha1'], 'sha1')
 
-        # Try MD5 (least preferred)
         if 'md5' in file_data and file_data['md5']:
             return self.check_hash(file_data['md5'], 'md5')
 
@@ -355,7 +333,6 @@ class VirusTotalChecker:
         return self.stats.copy()
 
 
-# Singleton pattern
 _vt_checkers: Dict[str, VirusTotalChecker] = {}
 
 def get_virustotal_checker(api_key: str = "") -> VirusTotalChecker:

@@ -25,26 +25,18 @@ from PySide6.QtGui import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
-
 @dataclass
 class TimelineEvent:
     """A single forensic event to be plotted on the timeline."""
 
     timestamp: datetime
     name: str
-    event_type: str          # activity category shown on Y axis
+    event_type: str
     details: str
-    risk_score: int          # 0-100
-    mitre_stage: str         # key into MITRE_COLORS
+    risk_score: int
+    mitre_stage: str
     color: QColor = field(default_factory=lambda: QColor("#95A5A6"))
 
-
-# ---------------------------------------------------------------------------
-# MITRE ATT&CK stage color palette
-# ---------------------------------------------------------------------------
 
 MITRE_COLORS: Dict[str, str] = {
     "Initial Access":        "#E74C3C",
@@ -61,7 +53,6 @@ MITRE_COLORS: Dict[str, str] = {
     "Unknown":               "#95A5A6",
 }
 
-# Internal stage name (from CorrelationEngine) -> display label
 _STAGE_DISPLAY_NAMES: Dict[str, str] = {
     "initial_access":        "Initial Access",
     "execution":             "Execution",
@@ -76,10 +67,6 @@ _STAGE_DISPLAY_NAMES: Dict[str, str] = {
     "impact":                "Impact",
 }
 
-
-# ---------------------------------------------------------------------------
-# Custom graphics items
-# ---------------------------------------------------------------------------
 
 class EventMarker(QGraphicsEllipseItem):
     """A clickable, hoverable circle representing one timeline event."""
@@ -99,7 +86,6 @@ class EventMarker(QGraphicsEllipseItem):
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setCursor(Qt.PointingHandCursor)
 
-        # Tooltip
         tip_lines = [
             f"<b>{event.name}</b>",
             f"Time: {event.timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
@@ -114,7 +100,6 @@ class EventMarker(QGraphicsEllipseItem):
             tip_lines.append(f"Details: {detail_text}")
         self.setToolTip("<br>".join(tip_lines))
 
-    # Visual feedback on hover
     def hoverEnterEvent(self, event):
         self.setScale(1.4)
         super().hoverEnterEvent(event)
@@ -123,10 +108,6 @@ class EventMarker(QGraphicsEllipseItem):
         self.setScale(1.0)
         super().hoverLeaveEvent(event)
 
-
-# ---------------------------------------------------------------------------
-# Timeline scene
-# ---------------------------------------------------------------------------
 
 class TimelineScene(QGraphicsScene):
     """
@@ -138,7 +119,6 @@ class TimelineScene(QGraphicsScene):
 
     event_clicked = Signal(dict)
 
-    # Layout constants
     MARGIN_LEFT = 160
     MARGIN_RIGHT = 40
     MARGIN_TOP = 40
@@ -162,7 +142,6 @@ class TimelineScene(QGraphicsScene):
         self._tick_font = QFont("Segoe UI", 8)
         self._title_font = QFont("Segoe UI", 11, QFont.Bold)
 
-    # ----- public API -----
 
     def set_events(self, events: List[TimelineEvent]):
         """Replace the current event list and redraw."""
@@ -178,7 +157,6 @@ class TimelineScene(QGraphicsScene):
         """Return (min_datetime, max_datetime) or (None, None)."""
         return self._time_min, self._time_max
 
-    # ----- internal drawing -----
 
     def _visible_events(self) -> List[TimelineEvent]:
         if self._filter_stage is None:
@@ -198,7 +176,6 @@ class TimelineScene(QGraphicsScene):
             self.setSceneRect(QRectF(0, 0, 400, 100))
             return
 
-        # Determine categories and time range
         type_set: Dict[str, int] = {}
         for ev in visible:
             if ev.event_type not in type_set:
@@ -209,7 +186,6 @@ class TimelineScene(QGraphicsScene):
         self._time_min = min(timestamps)
         self._time_max = max(timestamps)
 
-        # Add padding so single-event timelines are visible
         if self._time_min == self._time_max:
             self._time_min -= timedelta(hours=1)
             self._time_max += timedelta(hours=1)
@@ -221,7 +197,6 @@ class TimelineScene(QGraphicsScene):
         scene_w = self.MARGIN_LEFT + plot_width + self.MARGIN_RIGHT
         scene_h = self.MARGIN_TOP + plot_height + self.MARGIN_BOTTOM
 
-        # Background
         bg = self.addRect(
             QRectF(0, 0, scene_w, scene_h),
             QPen(Qt.NoPen),
@@ -229,12 +204,10 @@ class TimelineScene(QGraphicsScene):
         )
         bg.setZValue(-10)
 
-        # Draw axes
         self._draw_y_axis(scene_h, plot_height)
         self._draw_x_axis(scene_w, scene_h, plot_width, plot_height)
         self._draw_grid(plot_width, plot_height)
 
-        # Place markers
         time_span = (self._time_max - self._time_min).total_seconds()
         if time_span == 0:
             time_span = 1
@@ -255,7 +228,6 @@ class TimelineScene(QGraphicsScene):
 
     def _draw_y_axis(self, scene_h: float, plot_height: float):
         """Draw category labels along the Y axis."""
-        # Vertical axis line
         self.addLine(
             self.MARGIN_LEFT, self.MARGIN_TOP,
             self.MARGIN_LEFT, self.MARGIN_TOP + plot_height,
@@ -264,13 +236,11 @@ class TimelineScene(QGraphicsScene):
 
         for idx, label_text in enumerate(self._event_types):
             y = self.MARGIN_TOP + idx * self.ROW_HEIGHT + self.ROW_HEIGHT / 2
-            # Tick mark
             self.addLine(
                 self.MARGIN_LEFT - 4, y,
                 self.MARGIN_LEFT, y,
                 self._axis_pen,
             )
-            # Label
             label = self.addSimpleText(label_text, self._label_font)
             label.setBrush(QBrush(QColor("#CCCCCC")))
             label_width = label.boundingRect().width()
@@ -282,7 +252,6 @@ class TimelineScene(QGraphicsScene):
         """Draw time tick marks along the X axis."""
         y_axis_bottom = self.MARGIN_TOP + plot_height
 
-        # Horizontal axis line
         self.addLine(
             self.MARGIN_LEFT, y_axis_bottom,
             self.MARGIN_LEFT + plot_width, y_axis_bottom,
@@ -292,7 +261,6 @@ class TimelineScene(QGraphicsScene):
         if self._time_min is None or self._time_max is None:
             return
 
-        # Choose a sensible number of ticks
         num_ticks = min(12, max(4, int(plot_width / 100)))
         time_span = (self._time_max - self._time_min).total_seconds()
 
@@ -301,11 +269,9 @@ class TimelineScene(QGraphicsScene):
             x = self.MARGIN_LEFT + frac * plot_width
             dt = self._time_min + timedelta(seconds=frac * time_span)
 
-            # Tick mark
             self.addLine(x, y_axis_bottom, x, y_axis_bottom + self.TICK_HEIGHT,
                          self._axis_pen)
 
-            # Label
             if time_span > 86400 * 2:
                 fmt = "%Y-%m-%d"
             elif time_span > 3600 * 2:
@@ -330,7 +296,6 @@ class TimelineScene(QGraphicsScene):
             )
             line.setZValue(-5)
 
-    # ----- selection handling (called by the view) -----
 
     def handle_marker_click(self, marker: EventMarker):
         """Emit event_clicked with the event data as a dict."""
@@ -344,10 +309,6 @@ class TimelineScene(QGraphicsScene):
             "mitre_stage": ev.mitre_stage,
         })
 
-
-# ---------------------------------------------------------------------------
-# Interactive graphics view with pan / zoom
-# ---------------------------------------------------------------------------
 
 class _TimelineView(QGraphicsView):
     """QGraphicsView with mouse-wheel zoom and middle-button pan."""
@@ -409,14 +370,9 @@ class _TimelineView(QGraphicsView):
         if not scene_rect.isNull():
             self.fitInView(scene_rect.marginsAdded(QMarginsF(20, 20, 20, 20)),
                            Qt.KeepAspectRatio)
-            # Approximate the new zoom factor
             t = self.transform()
             self._zoom_factor = t.m11()
 
-
-# ---------------------------------------------------------------------------
-# Legend widget
-# ---------------------------------------------------------------------------
 
 class _MitreLegend(QWidget):
     """Compact horizontal legend showing MITRE stage colors."""
@@ -441,10 +397,6 @@ class _MitreLegend(QWidget):
         layout.addStretch()
 
 
-# ---------------------------------------------------------------------------
-# Main tab widget
-# ---------------------------------------------------------------------------
-
 class TimelineTab(QWidget):
     """
     Top-level widget for the forensic timeline visualization.
@@ -464,14 +416,12 @@ class TimelineTab(QWidget):
         self._build_ui()
         self._connect_signals()
 
-    # ----- UI construction -----
 
     def _build_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- Toolbar ---
         toolbar = QToolBar()
         toolbar.setMovable(False)
         toolbar.setIconSize(toolbar.iconSize())
@@ -514,18 +464,15 @@ class TimelineTab(QWidget):
 
         main_layout.addWidget(toolbar)
 
-        # --- Graphics view ---
         self._scene = TimelineScene(self)
         self._view = _TimelineView(self._scene, self)
         self._view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         main_layout.addWidget(self._view, stretch=1)
 
-        # --- Legend ---
         self._legend = _MitreLegend(self)
         self._legend.setStyleSheet("background: #2A2A2A; border-top: 1px solid #444;")
         main_layout.addWidget(self._legend)
 
-        # --- Status bar ---
         self._status_bar = QStatusBar()
         self._status_bar.setStyleSheet(
             "QStatusBar { background: #252525; color: #999; font-size: 11px; border-top: 1px solid #444; }"
@@ -541,7 +488,6 @@ class TimelineTab(QWidget):
         self._filter_combo.currentIndexChanged.connect(self._on_filter_changed)
         self._scene.event_clicked.connect(self._on_event_clicked)
 
-    # ----- public API -----
 
     def load_events(self, events: List[TimelineEvent]):
         """
@@ -550,7 +496,6 @@ class TimelineTab(QWidget):
         Args:
             events: List of TimelineEvent dataclass instances.
         """
-        # Assign colors from MITRE palette if not already set
         for ev in events:
             hex_color = MITRE_COLORS.get(ev.mitre_stage, MITRE_COLORS["Unknown"])
             ev.color = QColor(hex_color)
@@ -579,7 +524,6 @@ class TimelineTab(QWidget):
             color = QColor(hex_color)
 
             for artifact in stage.artifacts:
-                # Resolve timestamp
                 ts = None
                 for ts_field in ("modified", "created", "accessed"):
                     raw = artifact.get(ts_field)
@@ -589,7 +533,6 @@ class TimelineTab(QWidget):
                             break
 
                 if ts is None:
-                    # Use stage timestamp range start as fallback
                     if stage.timestamp_range and stage.timestamp_range[0]:
                         ts = self._parse_timestamp(stage.timestamp_range[0])
                     if ts is None:
@@ -620,7 +563,6 @@ class TimelineTab(QWidget):
 
         self.load_events(events)
 
-    # ----- internal helpers -----
 
     @staticmethod
     def _parse_timestamp(raw) -> Optional[datetime]:

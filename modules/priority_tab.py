@@ -43,9 +43,9 @@ except ImportError:
 class RiskScoringThread(QThread):
     """Background thread for scoring files."""
 
-    progress = Signal(int, int)  # current, total
-    file_scored = Signal(dict)  # file_data with score
-    finished = Signal(list)  # all scored files
+    progress = Signal(int, int)
+    file_scored = Signal(dict)
+    finished = Signal(list)
 
     def __init__(self, files_to_score):
         super().__init__()
@@ -71,7 +71,6 @@ class RiskScoringThread(QThread):
                 self.file_scored.emit(file_data)
                 self.progress.emit(idx + 1, len(self.files))
             except Exception as e:
-                # Skip files that fail scoring
                 print(f"Warning: Failed to score file: {e}")
                 pass
 
@@ -113,8 +112,8 @@ class PriorityTab(QWidget):
         self.scored_files = []
         self.scoring_thread = None
         self.ai_thread = None
-        self.media_warning = None  # For TRIM warning banner
-        self.case_id = "default"  # Will be set when image loads
+        self.media_warning = None
+        self.case_id = "default"
 
         self.init_ui()
 
@@ -124,7 +123,6 @@ class PriorityTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Header
         header = QWidget()
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(10, 10, 10, 10)
@@ -135,7 +133,6 @@ class PriorityTab(QWidget):
 
         header_layout.addStretch()
 
-        # Scan button
         self.scan_button = QPushButton("Scan for Threats")
         self.scan_button.setObjectName("scanButton")
         self.scan_button.clicked.connect(self.scan_files)
@@ -144,10 +141,8 @@ class PriorityTab(QWidget):
 
         layout.addWidget(header)
 
-        # Main splitter
         splitter = QSplitter(Qt.Horizontal)
 
-        # Left: Priority tree
         self.priority_tree = QTreeWidget()
         self.priority_tree.setHeaderLabels(['Artifact', 'Score', 'Severity'])
         self.priority_tree.setColumnWidth(0, 400)
@@ -156,40 +151,33 @@ class PriorityTab(QWidget):
         self.priority_tree.itemClicked.connect(self.on_item_clicked)
         splitter.addWidget(self.priority_tree)
 
-        # Right: Details panel
         details_widget = QWidget()
         details_layout = QVBoxLayout(details_widget)
         details_layout.setContentsMargins(10, 10, 10, 10)
 
-        # Details title
         details_title = QLabel("Artifact Details")
         details_title.setObjectName("detailsTitle")
         details_layout.addWidget(details_title)
 
-        # Details text
         self.details_text = QTextEdit()
         self.details_text.setReadOnly(True)
         self.details_text.setPlaceholderText("Select an artifact to view details...")
         details_layout.addWidget(self.details_text)
 
-        # Button layout
         button_layout = QHBoxLayout()
 
-        # AI Explain button
         self.explain_button = QPushButton("AI Explain Risk")
         self.explain_button.setObjectName("aiExplainButton")
         self.explain_button.setEnabled(False)
         self.explain_button.clicked.connect(self.explain_risk)
         button_layout.addWidget(self.explain_button)
 
-        # Save as Investigator Note button
         self.save_note_button = QPushButton("Save as Note")
         self.save_note_button.setObjectName("successButton")
         self.save_note_button.setEnabled(False)
         self.save_note_button.clicked.connect(self.save_as_note)
         button_layout.addWidget(self.save_note_button)
 
-        # View Audit Trail button
         self.audit_button = QPushButton("View Audit Trail")
         self.audit_button.setObjectName("primaryButton")
         self.audit_button.setEnabled(False)
@@ -203,7 +191,6 @@ class PriorityTab(QWidget):
 
         layout.addWidget(splitter)
 
-        # Info label
         self.info_label = QLabel("Load an evidence image and click 'Scan for Threats' to analyze files")
         self.info_label.setObjectName("infoLabel")
         layout.addWidget(self.info_label)
@@ -213,24 +200,20 @@ class PriorityTab(QWidget):
         self.image_handler = image_handler
         self.scan_button.setEnabled(True)
 
-        # Detect media type and show TRIM warning if needed
         try:
             from managers.media_detector import detect_media
 
             media_info = detect_media(image_handler)
 
             if media_info.trim_enabled:
-                # Remove old warning if exists
                 if self.media_warning:
                     self.media_warning.setParent(None)
 
-                # Create new warning banner
                 self.media_warning = QLabel(
                     f"  WARNING: TRIM DETECTED ({media_info.trim_confidence*100:.0f}% confidence) - "
                     f"Deleted file recovery probability is LOW"
                 )
                 self.media_warning.setObjectName("warningBanner")
-                # Insert at top of layout (position 0)
                 self.layout().insertWidget(0, self.media_warning)
 
                 self.info_label.setText(
@@ -243,7 +226,6 @@ class PriorityTab(QWidget):
                     f"Click 'Scan for Threats' to analyze files"
                 )
         except Exception as e:
-            # Silently continue if media detection fails
             self.info_label.setText("Click 'Scan for Threats' to analyze all files in the image")
 
     def scan_files(self):
@@ -252,24 +234,19 @@ class PriorityTab(QWidget):
             QMessageBox.warning(self, "No Image", "Please load an evidence image first.")
             return
 
-        # Collect all files from image
         self.info_label.setText("Collecting files from image...")
         files_to_score = []
 
         try:
-            # Get all partitions
             partitions = self.image_handler.get_partitions()
 
             if not partitions:
-                # No partitions, try root
                 if self.image_handler.has_filesystem(0):
                     self._collect_files_recursive(0, None, "", files_to_score)
             else:
-                # Collect from each partition
                 for addr, desc, start, length in partitions:
                     desc_str = desc.decode('utf-8') if isinstance(desc, bytes) else desc
 
-                    # Skip unallocated/special partitions
                     if "Unallocated" in desc_str or "Table" in desc_str:
                         continue
 
@@ -286,13 +263,11 @@ class PriorityTab(QWidget):
             self.info_label.setText("No files found")
             return
 
-        # Show progress and start scoring
         progress = QProgressDialog("Scoring files for risk...", "Cancel", 0, len(files_to_score), self)
         progress.setWindowModality(Qt.WindowModal)
         progress.setWindowTitle("Risk Analysis")
         progress.show()
 
-        # Start scoring thread
         self.scoring_thread = RiskScoringThread(files_to_score)
         self.scoring_thread.progress.connect(lambda curr, total: progress.setValue(curr))
         self.scoring_thread.finished.connect(lambda results: self.display_results(results, progress))
@@ -312,7 +287,6 @@ class PriorityTab(QWidget):
                 full_path = f"{path_prefix}/{entry_name}" if path_prefix else entry_name
 
                 if entry.get("is_directory"):
-                    # Recurse into directory
                     self._collect_files_recursive(
                         start_offset,
                         entry.get("inode_number"),
@@ -320,7 +294,6 @@ class PriorityTab(QWidget):
                         files_list
                     )
                 else:
-                    # Add file to list
                     files_list.append({
                         'name': entry_name,
                         'path': full_path,
@@ -332,7 +305,6 @@ class PriorityTab(QWidget):
                         'offset': start_offset
                     })
 
-                    # Limit to prevent memory issues (remove this for full scan)
                     if len(files_list) >= 10000:
                         return
 
@@ -346,7 +318,6 @@ class PriorityTab(QWidget):
         self.scored_files = scored_files
         self.priority_tree.clear()
 
-        # Group by severity
         critical = []
         high = []
         medium = []
@@ -367,7 +338,6 @@ class PriorityTab(QWidget):
             else:
                 info.append(file_data)
 
-        # Create top-level categories
         if critical:
             self._add_category("CRITICAL", critical, QColor(231, 76, 60))
 
@@ -380,7 +350,6 @@ class PriorityTab(QWidget):
         if low:
             self._add_category("LOW", low, QColor(52, 152, 219))
 
-        # Update info label
         total_flagged = len(critical) + len(high) + len(medium) + len(low)
         self.info_label.setText(
             f"Found {total_flagged} flagged artifacts: "
@@ -388,7 +357,6 @@ class PriorityTab(QWidget):
             f"{len(medium)} Medium, {len(low)} Low"
         )
 
-        # Expand critical by default
         if self.priority_tree.topLevelItemCount() > 0:
             self.priority_tree.topLevelItem(0).setExpanded(True)
 
@@ -402,7 +370,6 @@ class PriorityTab(QWidget):
         font.setBold(True)
         category.setFont(0, font)
 
-        # Sort by score descending
         files.sort(key=lambda x: x.get('risk_score', 0), reverse=True)
 
         for file_data in files:
@@ -419,7 +386,6 @@ class PriorityTab(QWidget):
         if not file_data:
             return
 
-        # Display details with rule weights
         details = f"<b>File:</b> {file_data.get('name', 'unknown')}<br>"
         details += f"<b>Path:</b> {file_data.get('path', 'unknown')}<br>"
         details += f"<b>Size:</b> {file_data.get('size', 0):,} bytes<br>"
@@ -430,7 +396,6 @@ class PriorityTab(QWidget):
         details_dict = file_data.get('risk_details', {})
 
         if reasons:
-            # Get rule weights
             try:
                 scorer = RiskScorer()
                 details += "<b>Rule Chain:</b><ul>"
@@ -444,13 +409,11 @@ class PriorityTab(QWidget):
 
                 details += "</ul>"
 
-                # Show weight calculation if capped
                 final_score = file_data.get('risk_score', 0)
                 if total_weight > 100:
                     details += f"<i style='color: #7f8c8d;'>Total weight: {total_weight} pts → Capped at {final_score}</i><br><br>"
 
             except:
-                # Fallback to simple list if scorer unavailable
                 details += "<b>Flagged For:</b><ul>"
                 for reason in reasons:
                     desc = details_dict.get(reason, reason)
@@ -464,7 +427,6 @@ class PriorityTab(QWidget):
                 details += f"<li>{rec}</li>"
             details += "</ul>"
 
-        # Display overwrite analysis if available
         overwrite_analysis = file_data.get('overwrite_analysis')
         if overwrite_analysis:
             details += "<br><hr>"
@@ -489,8 +451,8 @@ class PriorityTab(QWidget):
         self.details_text.setHtml(details)
         self.explain_button.setEnabled(True)
         self.audit_button.setEnabled(True)
-        self.save_note_button.setEnabled(False)  # Disable until AI explanation generated
-        self.save_note_button.setText("📝 Save as Note")  # Reset text
+        self.save_note_button.setEnabled(False)
+        self.save_note_button.setText("📝 Save as Note")
         self.current_selected_file = file_data
 
     def explain_risk(self):
@@ -500,7 +462,6 @@ class PriorityTab(QWidget):
 
         file_data = self.current_selected_file
 
-        # Check AI availability
         if get_ai_service is None:
             QMessageBox.warning(
                 self,
@@ -519,13 +480,11 @@ class PriorityTab(QWidget):
             )
             return
 
-        # Show progress
         progress = QProgressDialog("Generating AI explanation...", None, 0, 0, self)
         progress.setWindowModality(Qt.WindowModal)
         progress.setCancelButton(None)
         progress.show()
 
-        # Start AI thread
         self.ai_thread = AIExplanationThread(
             file_data,
             file_data.get('risk_score', 0),
@@ -539,15 +498,12 @@ class PriorityTab(QWidget):
         """Show AI explanation dialog."""
         progress_dialog.close()
 
-        # Store explanation for potential saving
         self.last_ai_explanation = explanation
 
-        # Add to current details
         current_html = self.details_text.toHtml()
         ai_section = f"<br><hr><b>AI Risk Analysis:</b><br><p>{explanation}</p>"
         self.details_text.setHtml(current_html + ai_section)
 
-        # Enable save button
         self.save_note_button.setEnabled(True)
 
     def show_ai_error(self, error, progress_dialog):
@@ -564,16 +520,13 @@ class PriorityTab(QWidget):
         explanation = self.last_ai_explanation
 
         try:
-            # Get notes manager
             from managers.notes_manager import get_notes_manager, Note
 
             notes_mgr = get_notes_manager()
 
-            # Create structured note with metadata
             artifact_id = str(file_data.get('inode', file_data.get('name', '')))
             artifact_name = file_data.get('name', 'Unknown')
 
-            # Build note content with metadata
             note_content = f"""AI Risk Analysis - {artifact_name}
 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 Risk Score: {file_data.get('risk_score', 0)}/100
@@ -586,7 +539,6 @@ Severity: {file_data.get('severity', 'unknown').upper()}
 Path: {file_data.get('path', 'Unknown')}
 Size: {file_data.get('size', 0):,} bytes
 """
-            # Add overwrite analysis if available
             if file_data.get('overwrite_analysis'):
                 oa = file_data['overwrite_analysis']
                 note_content += f"""
@@ -596,7 +548,6 @@ Overwrite Analysis:
 - Recovery Feasible: {'Yes' if oa.recovery_feasible else 'No'}
 """
 
-            # Save note
             note = notes_mgr.add_note(
                 artifact_type='file',
                 artifact_id=artifact_id,
@@ -606,7 +557,6 @@ Overwrite Analysis:
                 tags=['ai-analysis', 'risk-assessment', file_data.get('severity', 'unknown')]
             )
 
-            # Show confirmation
             QMessageBox.information(
                 self,
                 "Note Saved",
@@ -615,10 +565,8 @@ Overwrite Analysis:
                 f"This note will be included in the final forensic report."
             )
 
-            # Disable save button (already saved)
             self.save_note_button.setEnabled(False)
 
-            # Update button text to indicate saved
             self.save_note_button.setText("✓ Saved as Note")
 
         except Exception as e:
@@ -633,18 +581,14 @@ Overwrite Analysis:
         artifact_id = str(file_data.get('inode', file_data.get('name', '')))
 
         try:
-            # Get audit logger
             audit_logger = get_audit_logger(case_id=self.case_id)
 
-            # Get audit history
             history = audit_logger.get_artifact_history(artifact_id)
 
-            # Format for display
             audit_html = "<h2>Audit Trail</h2>"
             audit_html += f"<p><b>Artifact:</b> {file_data.get('name', 'unknown')}<br>"
             audit_html += f"<b>ID:</b> {artifact_id}</p>"
 
-            # Rule firing events
             if history['rule_logs']:
                 audit_html += "<h3>Risk Assessments:</h3>"
                 for log in history['rule_logs']:
@@ -661,7 +605,6 @@ Overwrite Analysis:
                     audit_html += f"Input Hash: <code>{log['input_hash'][:16]}...</code></p>"
                     audit_html += "</div>"
 
-            # AI interactions
             if history['ai_logs']:
                 audit_html += "<h3>AI Interactions:</h3>"
                 for log in history['ai_logs']:
@@ -679,7 +622,6 @@ Overwrite Analysis:
                 audit_html += "<p style='color: #7f8c8d;'>No audit trail found for this artifact.</p>"
                 audit_html += "<p><i>Note: Audit logging may not have been enabled when this file was analyzed.</i></p>"
 
-            # Show in dialog
             from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextBrowser, QPushButton, QHBoxLayout
 
             dialog = QDialog(self)
@@ -693,16 +635,13 @@ Overwrite Analysis:
             browser.setOpenExternalLinks(False)
             layout.addWidget(browser)
 
-            # Button layout
             btn_layout = QHBoxLayout()
             btn_layout.addStretch()
 
-            # Export button
             export_btn = QPushButton("Export to JSON")
             export_btn.clicked.connect(lambda: self._export_audit_trail(artifact_id))
             btn_layout.addWidget(export_btn)
 
-            # Close button
             close_btn = QPushButton("Close")
             close_btn.clicked.connect(dialog.close)
             btn_layout.addWidget(close_btn)
@@ -727,7 +666,6 @@ Overwrite Analysis:
             audit_logger = get_audit_logger(case_id=self.case_id)
             history = audit_logger.get_artifact_history(artifact_id)
 
-            # Ask user for save location
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Export Audit Trail",
@@ -759,7 +697,6 @@ Overwrite Analysis:
         self.explain_button.setEnabled(False)
         self.audit_button.setEnabled(False)
 
-        # Remove media warning if exists
         if self.media_warning:
             self.media_warning.setParent(None)
             self.media_warning = None

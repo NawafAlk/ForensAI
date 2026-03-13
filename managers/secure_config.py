@@ -14,7 +14,6 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Attempt to import optional encryption dependencies
 try:
     from cryptography.fernet import Fernet, InvalidToken
     HAS_CRYPTOGRAPHY = True
@@ -69,9 +68,6 @@ class SecureConfig:
                     "falling back to plaintext: %s", exc
                 )
 
-    # ------------------------------------------------------------------
-    # Key management
-    # ------------------------------------------------------------------
 
     def _get_or_create_key(self) -> bytes:
         """Retrieve the Fernet master key from the system keyring.
@@ -92,9 +88,6 @@ class SecureConfig:
         key = self._get_or_create_key()
         return Fernet(key)
 
-    # ------------------------------------------------------------------
-    # Encryption helpers
-    # ------------------------------------------------------------------
 
     def _encrypt(self, value: str) -> str:
         """Encrypt a string value and return it as a base64-encoded string."""
@@ -110,9 +103,6 @@ class SecureConfig:
         plaintext = self._cipher.decrypt(encrypted.encode("utf-8"))
         return plaintext.decode("utf-8")
 
-    # ------------------------------------------------------------------
-    # Internal persistence helpers
-    # ------------------------------------------------------------------
 
     def _encrypted_section(self, section: str) -> str:
         """Return the config.ini section name used for encrypted values."""
@@ -123,9 +113,6 @@ class SecureConfig:
         with open(self._config_path, "w", encoding="utf-8") as fh:
             self._config.write(fh)
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def get(self, section: str, key: str, fallback: str = "") -> str:
         """Get a configuration value.
@@ -134,7 +121,6 @@ class SecureConfig:
         1. Encrypted storage (if encryption is available).
         2. Plaintext config.ini (enables seamless migration).
         """
-        # Try encrypted storage first
         if self._cipher is not None:
             enc_section = self._encrypted_section(section)
             if self._config.has_section(enc_section) and self._config.has_option(enc_section, key):
@@ -146,7 +132,6 @@ class SecureConfig:
                         section, key, exc,
                     )
 
-        # Fallback to plaintext section
         if self._config.has_section(section) and self._config.has_option(section, key):
             return self._config.get(section, key)
 
@@ -164,7 +149,6 @@ class SecureConfig:
                 self._config.add_section(enc_section)
             self._config.set(enc_section, key, self._encrypt(value))
         else:
-            # Fallback: store plaintext
             if not self._config.has_section(section):
                 self._config.add_section(section)
             self._config.set(section, key, value)
@@ -175,16 +159,13 @@ class SecureConfig:
         """Remove a configuration value from both encrypted and plaintext storage."""
         changed = False
 
-        # Remove from encrypted section
         enc_section = self._encrypted_section(section)
         if self._config.has_section(enc_section) and self._config.has_option(enc_section, key):
             self._config.remove_option(enc_section, key)
-            # Clean up empty sections
             if not self._config.options(enc_section):
                 self._config.remove_section(enc_section)
             changed = True
 
-        # Remove from plaintext section
         if self._config.has_section(section) and self._config.has_option(section, key):
             self._config.remove_option(section, key)
             if not self._config.options(section):
@@ -217,16 +198,13 @@ class SecureConfig:
                 if not plaintext_value:
                     continue
 
-                # Store encrypted version
                 if not self._config.has_section(enc_section):
                     self._config.add_section(enc_section)
                 self._config.set(enc_section, key, self._encrypt(plaintext_value))
 
-                # Clear the plaintext value
                 self._config.remove_option(section, key)
                 migrated_count += 1
 
-            # Remove empty plaintext sections
             if not self._config.options(section):
                 self._config.remove_section(section)
 
@@ -244,10 +222,6 @@ class SecureConfig:
             or self._config.has_section(section)
         )
 
-
-# ------------------------------------------------------------------
-# Singleton accessor
-# ------------------------------------------------------------------
 
 _instance: Optional[SecureConfig] = None
 

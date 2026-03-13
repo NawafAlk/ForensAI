@@ -30,11 +30,11 @@ class WhitelistEntry:
     product_name: str = ""
     vendor: str = ""
     version: str = ""
-    source: str = "custom"  # nsrl, virustotal, custom, signature
+    source: str = "custom"
     added_date: str = ""
     added_by: str = ""
     notes: str = ""
-    confidence: float = 1.0  # 0.0-1.0
+    confidence: float = 1.0
 
     def matches(self, file_hash: str, hash_type: str = "sha256") -> bool:
         """Check if file hash matches this entry"""
@@ -55,7 +55,7 @@ class WhitelistResult:
     entry: Optional[WhitelistEntry] = None
     confidence: float = 0.0
     reason: str = ""
-    matched_by: str = ""  # sha256, md5, sha1
+    matched_by: str = ""
 
 
 class WhitelistManager:
@@ -73,7 +73,6 @@ class WhitelistManager:
         self.whitelist_dir = Path(whitelist_dir)
         self.whitelist_dir.mkdir(exist_ok=True)
 
-        # In-memory whitelist cache
         self.whitelists: Dict[str, List[WhitelistEntry]] = {
             "nsrl": [],
             "custom": [],
@@ -81,12 +80,10 @@ class WhitelistManager:
             "signature": []
         }
 
-        # Hash lookup tables for fast checking
         self.sha256_lookup: Dict[str, WhitelistEntry] = {}
         self.md5_lookup: Dict[str, WhitelistEntry] = {}
         self.sha1_lookup: Dict[str, WhitelistEntry] = {}
 
-        # Load existing whitelists
         self._load_whitelists()
 
     def _load_whitelists(self):
@@ -100,7 +97,6 @@ class WhitelistManager:
                         entries = [WhitelistEntry(**entry) for entry in data.get('entries', [])]
                         self.whitelists[source] = entries
 
-                        # Build lookup tables
                         for entry in entries:
                             self.sha256_lookup[entry.hash_sha256.lower()] = entry
                             if entry.hash_md5:
@@ -137,7 +133,6 @@ class WhitelistManager:
         Returns:
             WhitelistResult with match information
         """
-        # Try SHA256 first (most reliable)
         if 'sha256' in file_data and file_data['sha256']:
             sha256 = file_data['sha256'].lower()
             if sha256 in self.sha256_lookup:
@@ -150,7 +145,6 @@ class WhitelistManager:
                     matched_by="sha256"
                 )
 
-        # Try MD5 (less reliable, but common)
         if 'md5' in file_data and file_data['md5']:
             md5 = file_data['md5'].lower()
             if md5 in self.md5_lookup:
@@ -158,12 +152,11 @@ class WhitelistManager:
                 return WhitelistResult(
                     is_whitelisted=True,
                     entry=entry,
-                    confidence=entry.confidence * 0.9,  # Lower confidence for MD5
+                    confidence=entry.confidence * 0.9,
                     reason=f"Matched in {entry.source} whitelist (MD5)",
                     matched_by="md5"
                 )
 
-        # Try SHA1
         if 'sha1' in file_data and file_data['sha1']:
             sha1 = file_data['sha1'].lower()
             if sha1 in self.sha1_lookup:
@@ -171,12 +164,11 @@ class WhitelistManager:
                 return WhitelistResult(
                     is_whitelisted=True,
                     entry=entry,
-                    confidence=entry.confidence * 0.95,  # Slightly lower for SHA1
+                    confidence=entry.confidence * 0.95,
                     reason=f"Matched in {entry.source} whitelist (SHA1)",
                     matched_by="sha1"
                 )
 
-        # Not whitelisted
         return WhitelistResult(
             is_whitelisted=False,
             confidence=0.0,
@@ -210,7 +202,6 @@ class WhitelistManager:
             print(f"[Whitelist] Invalid source: {source}")
             return False
 
-        # Check if already exists
         if hash_sha256.lower() in self.sha256_lookup:
             print(f"[Whitelist] Entry already exists: {hash_sha256}")
             return False
@@ -230,17 +221,14 @@ class WhitelistManager:
             confidence=confidence
         )
 
-        # Add to whitelist
         self.whitelists[source].append(entry)
 
-        # Add to lookup tables
         self.sha256_lookup[entry.hash_sha256] = entry
         if entry.hash_md5:
             self.md5_lookup[entry.hash_md5] = entry
         if entry.hash_sha1:
             self.sha1_lookup[entry.hash_sha1] = entry
 
-        # Save to disk
         self._save_whitelist(source)
 
         print(f"[Whitelist] Added entry to {source}: {filename or hash_sha256[:16]}")
@@ -264,18 +252,15 @@ class WhitelistManager:
         entry = self.sha256_lookup[hash_lower]
         source = entry.source
 
-        # Remove from whitelist
         self.whitelists[source] = [e for e in self.whitelists[source]
                                     if e.hash_sha256 != hash_lower]
 
-        # Remove from lookup tables
         del self.sha256_lookup[hash_lower]
         if entry.hash_md5 and entry.hash_md5 in self.md5_lookup:
             del self.md5_lookup[entry.hash_md5]
         if entry.hash_sha1 and entry.hash_sha1 in self.sha1_lookup:
             del self.sha1_lookup[entry.hash_sha1]
 
-        # Save to disk
         self._save_whitelist(source)
 
         print(f"[Whitelist] Removed entry: {hash_sha256[:16]}")
@@ -305,25 +290,22 @@ class WhitelistManager:
                     if count >= max_entries:
                         break
 
-                    # NSRL RDS format: SHA-1, MD5, CRC32, FileName, FileSize, ProductCode, OpSystemCode, SpecialCode
                     sha1 = row.get('SHA-1', '').strip()
                     md5 = row.get('MD5', '').strip()
                     filename = row.get('FileName', '').strip()
                     product_code = row.get('ProductCode', '').strip()
 
                     if sha1 and md5:
-                        # Note: NSRL doesn't have SHA256, so we use SHA1 as primary
-                        # In production, would need to hash the actual file
                         self.add_entry(
                             source="nsrl",
-                            hash_sha256=sha1,  # Using SHA1 as placeholder
+                            hash_sha256=sha1,
                             hash_sha1=sha1,
                             hash_md5=md5,
                             filename=filename,
                             product_name=f"NSRL Product {product_code}",
                             vendor="NSRL",
                             notes="Imported from NSRL RDS",
-                            confidence=0.95  # High confidence for NSRL
+                            confidence=0.95
                         )
                         count += 1
 
@@ -366,7 +348,6 @@ class WhitelistManager:
             return False
 
 
-# Singleton pattern
 _whitelist_managers: Dict[str, WhitelistManager] = {}
 
 def get_whitelist_manager(case_id: str = "default") -> WhitelistManager:

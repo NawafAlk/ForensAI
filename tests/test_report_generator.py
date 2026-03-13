@@ -10,7 +10,6 @@ import tempfile
 import json
 from pathlib import Path
 
-# Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from modules.forensic_report_generator import (
@@ -26,22 +25,18 @@ def test_hash_verifier():
     """Test hash computation functionality."""
     print("Testing HashVerifier...")
 
-    # Create a temporary test file
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         f.write("Test content for hash verification\n" * 100)
         temp_file = f.name
 
     try:
-        # Compute hashes
         hashes = HashVerifier.compute_hashes(temp_file, ['md5', 'sha256'])
 
-        # Verify results
         assert 'md5' in hashes, "MD5 hash missing"
         assert 'sha256' in hashes, "SHA256 hash missing"
         assert len(hashes['md5']) == 32, "MD5 hash wrong length"
         assert len(hashes['sha256']) == 64, "SHA256 hash wrong length"
 
-        # Test verification
         match, results = HashVerifier.verify_hashes(temp_file, hashes)
         assert match, "Hash verification should match"
         assert all(results.values()), "All hashes should match"
@@ -50,7 +45,6 @@ def test_hash_verifier():
         return True
 
     finally:
-        # Cleanup
         if os.path.exists(temp_file):
             os.unlink(temp_file)
 
@@ -68,10 +62,8 @@ def test_chain_of_custody_entry():
         hashes={'md5': 'abc123', 'sha256': 'def456'}
     )
 
-    # Convert to dict
     entry_dict = entry.to_dict()
 
-    # Verify fields
     assert entry_dict['action'] == "Test action"
     assert entry_dict['actor'] == "Test Actor"
     assert entry_dict['source'] == "/test/source.dd"
@@ -99,10 +91,8 @@ def test_artifact_info():
     artifact.notable_reasons = ["test_reason"]
     artifact.priority = 50
 
-    # Convert to dict
     artifact_dict = artifact.to_dict()
 
-    # Verify fields
     assert artifact_dict['name'] == "file.txt"
     assert artifact_dict['size_bytes'] == 1024
     assert artifact_dict['type'] == "document"
@@ -123,10 +113,8 @@ def test_processing_step():
     assert step.command == "test command"
     assert step.success is True
 
-    # Complete the step
     step.complete(stdout="test output", stderr="", success=True)
 
-    # Convert to dict
     step_dict = step.to_dict()
 
     assert step_dict['step'] == "Test Step"
@@ -143,16 +131,13 @@ def test_report_generator_initialization():
     """Test report generator initialization."""
     print("Testing ForensicReportGenerator initialization...")
 
-    # Create temporary directories
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Create a dummy master image
         master_image = os.path.join(temp_dir, "test.dd")
         with open(master_image, 'wb') as f:
-            f.write(b'X' * 1024 * 1024)  # 1 MB test file
+            f.write(b'X' * 1024 * 1024)
 
         output_dir = os.path.join(temp_dir, "reports")
 
-        # Initialize generator
         generator = ForensicReportGenerator(
             case_id="TEST-001",
             operator="Test Operator",
@@ -160,7 +145,6 @@ def test_report_generator_initialization():
             output_dir=output_dir
         )
 
-        # Verify initialization
         assert generator.case_id == "TEST-001"
         assert generator.operator == "Test Operator"
         assert generator.master_image == os.path.abspath(master_image)
@@ -175,29 +159,24 @@ def test_report_generation():
     print("Testing report generation...")
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Create test master image
         master_image = os.path.join(temp_dir, "test.dd")
         with open(master_image, 'wb') as f:
             f.write(b'Test evidence data\n' * 1000)
 
-        # Create test artifacts directory
         artifacts_dir = os.path.join(temp_dir, "artifacts")
         os.makedirs(artifacts_dir)
 
-        # Create some test artifacts
         for i in range(10):
             artifact_path = os.path.join(artifacts_dir, f"test_file_{i}.txt")
             with open(artifact_path, 'w') as f:
                 f.write(f"Test artifact {i}\n" * 10)
 
-        # Create password file (should be flagged as notable)
         password_file = os.path.join(artifacts_dir, "passwords.txt")
         with open(password_file, 'w') as f:
             f.write("test password file\n")
 
         output_dir = os.path.join(temp_dir, "reports")
 
-        # Initialize generator
         generator = ForensicReportGenerator(
             case_id="TEST-002",
             operator="Test Analyst",
@@ -206,41 +185,33 @@ def test_report_generation():
             parsed_artifacts_dir=artifacts_dir
         )
 
-        # Generate report
         result = generator.generate_report(formats=['html', 'json'])
 
-        # Verify result
         assert result['status'] in ['success', 'partial'], f"Report generation failed: {result['summary']}"
         assert result['case_id'] == "TEST-002"
         assert result['report_html'] is not None, "HTML report not generated"
         assert result['manifest_json'] is not None, "JSON manifest not generated"
 
-        # Verify HTML file exists
         assert os.path.exists(result['report_html']), "HTML report file missing"
 
-        # Verify JSON file exists and is valid
         assert os.path.exists(result['manifest_json']), "JSON manifest file missing"
 
         with open(result['manifest_json'], 'r') as f:
             manifest = json.load(f)
 
-        # Verify JSON structure
         assert manifest['case_id'] == "TEST-002"
         assert manifest['operator'] == "Test Analyst"
         assert 'artifacts_count' in manifest
-        assert manifest['artifacts_count']['files'] == 11  # 10 test files + 1 password file
+        assert manifest['artifacts_count']['files'] == 11
         assert 'master_image' in manifest
         assert 'chain_of_custody' in manifest
         assert 'processing_steps' in manifest
 
-        # Verify notable artifacts detected
         notable_count = manifest['artifacts_count']['notable']
         assert notable_count >= 1, "Password file should be flagged as notable"
 
-        # Verify chain of custody
         assert len(manifest['chain_of_custody']) >= 1, "Chain of custody should have entries"
 
-        # Verify HTML content
         with open(result['report_html'], 'r', encoding='utf-8') as f:
             html_content = f.read()
 
@@ -269,7 +240,6 @@ def test_artifact_categorization():
         artifacts_dir = os.path.join(temp_dir, "artifacts")
         os.makedirs(artifacts_dir)
 
-        # Create files of different types
         test_files = {
             'document.pdf': 'document',
             'image.jpg': 'image',
@@ -298,10 +268,8 @@ def test_artifact_categorization():
             parsed_artifacts_dir=artifacts_dir
         )
 
-        # Scan artifacts
         generator.scan_artifacts()
 
-        # Verify categorization
         for artifact in generator.artifacts:
             expected_type = test_files.get(artifact.name)
             assert artifact.artifact_type == expected_type, \
@@ -325,7 +293,7 @@ def run_all_tests():
         test_processing_step,
         test_report_generator_initialization,
         test_artifact_categorization,
-        test_report_generation,  # Run this last as it's most comprehensive
+        test_report_generation,
     ]
 
     passed = 0

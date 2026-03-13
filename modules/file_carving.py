@@ -18,9 +18,9 @@ from PySide6.QtWidgets import QListWidget, QListWidgetItem, QToolBar, QSizePolic
 from PySide6.QtWidgets import QMenu
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLabel, QTabWidget
 try:
-    from moviepy.editor import VideoFileClip  # moviepy 1.x
+    from moviepy.editor import VideoFileClip
 except ImportError:
-    from moviepy import VideoFileClip  # moviepy 2.x
+    from moviepy import VideoFileClip
 from pdf2image import convert_from_path
 
 from managers.carving_confidence import CarvingConfidence, ConfidenceResult, CONFIDENCE_TIERS
@@ -28,13 +28,12 @@ from managers.carving_confidence import CarvingConfidence, ConfidenceResult, CON
 
 class NumericTableWidgetItem(QTableWidgetItem):
     def __lt__(self, other):
-        self_value = self.text().split()[0]  # Extract numeric part of the text
-        other_value = other.text().split()[0]  # Extract numeric part of the text
-        self_unit = self.text().split()[1]  # Extract unit part of the text
-        other_unit = other.text().split()[1]  # Extract unit part of the text
+        self_value = self.text().split()[0]
+        other_value = other.text().split()[0]
+        self_unit = self.text().split()[1]
+        other_unit = other.text().split()[1]
         units = {'B': 0, 'KB': 1, 'MB': 2, 'GB': 3, 'TB': 4}
 
-        # Convert to bytes for comparison
         self_bytes = float(self_value) * (1024 ** units[self_unit])
         other_bytes = float(other_value) * (1024 ** units[other_unit])
 
@@ -42,25 +41,24 @@ class NumericTableWidgetItem(QTableWidgetItem):
 
 
 class FileCarvingWidget(QWidget):
-    # Signal: name, size, type, modification_date, file_path, confidence_score, confidence_details
     file_carved = Signal(str, str, str, str, str, int, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.main_window = parent  # Store reference to main window
+        self.main_window = parent
         self.image_handler = None
-        self.executor = ThreadPoolExecutor(max_workers=4)  # ThreadPoolExecutor for background tasks
+        self.executor = ThreadPoolExecutor(max_workers=4)
         self.carved_files = []
-        self.carved_file_names = set()  # Track carved file names to avoid duplicates
-        self.confidence_evaluator = CarvingConfidence()  # Initialize confidence evaluator
+        self.carved_file_names = set()
+        self.confidence_evaluator = CarvingConfidence()
         self.carving_stats = {'complete': 0, 'good': 0, 'partial': 0, 'damaged': 0, 'fragment': 0}
-        self._stop_carving_flag = False  # Flag to signal carving should stop
+        self._stop_carving_flag = False
         self.init_ui()
 
     def init_ui(self):
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(0)  # Set the spacing to zero
+        self.layout.setSpacing(0)
 
         self.toolbar = QToolBar()
         self.toolbar.setContentsMargins(0, 0, 0, 0)
@@ -102,7 +100,6 @@ class FileCarvingWidget(QWidget):
         for fileType, checkBox in self.fileTypes.items():
             self.fileTypeLayout.addWidget(checkBox)
 
-        # Adding a widget to contain the file type checkboxes
         self.fileTypeWidget = QWidget()
         self.fileTypeWidget.setLayout(self.fileTypeLayout)
         self.toolbar.addWidget(self.fileTypeWidget)
@@ -119,7 +116,6 @@ class FileCarvingWidget(QWidget):
         self.toolbar.addWidget(self.stop_button)
         self.layout.addWidget(self.tab_widget)
 
-        # Summary bar for carving statistics
         self.summary_bar = QLabel("")
         self.summary_bar.setStyleSheet("""
             QLabel {
@@ -137,18 +133,16 @@ class FileCarvingWidget(QWidget):
 
     def create_table_widget(self):
         table_widget = QTableWidget()
-        table_widget.setColumnCount(7)  # Id, Name, Size, Type, Confidence, Date, Path
+        table_widget.setColumnCount(7)
         table_widget.setSelectionBehavior(QTableWidget.SelectRows)
         table_widget.setEditTriggers(QTableWidget.NoEditTriggers)
         table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         table_widget.setSortingEnabled(True)
 
-        # Include Confidence column
         table_widget.setHorizontalHeaderLabels(['Id', 'Name', 'Size', 'Type', 'Confidence', 'Date', 'Path'])
         table_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         table_widget.customContextMenuRequested.connect(self.open_context_menu)
 
-        # Add click handler for file preview
         table_widget.cellClicked.connect(self.on_carved_file_clicked)
 
         self.tab_widget = QTabWidget()
@@ -157,7 +151,6 @@ class FileCarvingWidget(QWidget):
 
     def create_list_widget(self):
         list_widget = QListWidget()
-        # remove space between items
         list_widget.setViewMode(QListWidget.IconMode)
 
         list_widget.setIconSize(QSize(100, 100))
@@ -165,12 +158,10 @@ class FileCarvingWidget(QWidget):
         list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         list_widget.customContextMenuRequested.connect(self.open_context_menu)
 
-        # Add click handler for file preview
         list_widget.itemClicked.connect(self.on_carved_list_item_clicked)
 
         toolbar = QToolBar()
 
-        # Define actions
         action_small_size = (QAction("Small Size", self))
         action_small_size.setIcon(QIcon('Icons/icons8-small-icons-50.png'))
 
@@ -180,38 +171,32 @@ class FileCarvingWidget(QWidget):
         action_large_size = (QAction("Large Size", self))
         action_large_size.setIcon(QIcon('Icons/icons8-large-icons-50.png'))
 
-        # Set icons
 
-        # Connect actions to new slot methods
         action_small_size.triggered.connect(self.set_small_size)
         action_medium_size.triggered.connect(self.set_medium_size)
         action_large_size.triggered.connect(self.set_large_size)
 
-        # Add actions to the toolbar
         toolbar.addAction(action_small_size)
         toolbar.addAction(action_medium_size)
         toolbar.addAction(action_large_size)
 
-        # Create a layout and add the toolbar and the list widget to it
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(toolbar)
         layout.addWidget(list_widget)
 
-        # Create a new widget, set its layout and add it to the tab widget
         widget = QWidget()
         widget.setLayout(layout)
         self.tab_widget.addTab(widget, "Thumbnails")
 
-        # self.tab_widget.addTab(list_widget, "Thumbnails")
         return list_widget
 
     def set_icon_size(self, size):
         self.list_widget.setIconSize(QSize(size, size))
         for index in range(self.list_widget.count()):
             item = self.list_widget.item(index)
-            item.setSizeHint(QSize(size + 20, size + 20))  # Provide some padding around the icon
+            item.setSizeHint(QSize(size + 20, size + 20))
 
     def set_small_size(self):
         self.set_icon_size(50)
@@ -230,7 +215,6 @@ class FileCarvingWidget(QWidget):
         self.carved_file_names.clear()
         self.carving_stats = {'complete': 0, 'good': 0, 'partial': 0, 'damaged': 0, 'fragment': 0}
 
-        # Ensure the 'carved_files' and 'thumbnails' directories exist
         if not os.path.exists("carved_files"):
             os.makedirs("carved_files")
         thumbnail_folder = os.path.join("carved_files", "thumbnails")
@@ -242,9 +226,9 @@ class FileCarvingWidget(QWidget):
         self.executor.submit(self.carve_files, selected_file_types)
 
     def stop_carving(self):
-        self._stop_carving_flag = True  # Set flag to signal carving should stop
-        self.start_button.setEnabled(True)  # Re-enable the start button
-        self.stop_button.setEnabled(False)  # Disable the stop button
+        self._stop_carving_flag = True
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
 
     def set_image_handler(self, image_handler):
         self.image_handler = image_handler
@@ -263,16 +247,16 @@ class FileCarvingWidget(QWidget):
         menu.exec_(self.table_widget.viewport().mapToGlobal(position))
 
     def open_image(self):
-        if self.tab_widget.currentIndex() == 0:  # If the table tab is active
+        if self.tab_widget.currentIndex() == 0:
             current_item = self.table_widget.currentItem()
-        else:  # If the thumbnail tab is active
+        else:
             current_item = self.list_widget.currentItem()
 
         if current_item:
             file_name = current_item.text()
             for file_info in self.carved_files:
                 if file_info[0] == file_name:
-                    file_path = file_info[3]  # The file path is now at index 3
+                    file_path = file_info[3]
                     QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
                     break
 
@@ -282,7 +266,7 @@ class FileCarvingWidget(QWidget):
             file_name = current_item.text()
             for file_info in self.carved_files:
                 if file_info[0] == file_name:
-                    file_path = file_info[3]  # The file path is now at index 3
+                    file_path = file_info[3]
                     QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.dirname(file_path)))
                     break
 
@@ -295,7 +279,6 @@ class FileCarvingWidget(QWidget):
     def start_carving_thread(self):
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
-        # Launch carving in a background thread
         self.executor.submit(self.carve_files)
 
     def stop_carving_thread(self):
@@ -317,11 +300,8 @@ class FileCarvingWidget(QWidget):
         Returns:
             bool: Always True (validation disabled for forensic purposes)
         """
-        # FORENSIC BEST PRACTICE: Always return True to carve ALL files (damaged or undamaged)
-        # Corrupted files may still contain valuable evidence and should be preserved
         return True
 
-        # Original validation code preserved but disabled:
         """
         try:
             if file_type == 'pdf':
@@ -466,7 +446,6 @@ class FileCarvingWidget(QWidget):
         except Exception as e:
             return False
         """
-        # End of disabled validation code
 
     def carve_pdf_files(self, chunk, global_offset):
         pdf_start_signature = b'%PDF-'
@@ -561,7 +540,7 @@ class FileCarvingWidget(QWidget):
 
             carving_meta = {
                 'header_found': True,
-                'footer_found': not truncated,  # WAV doesn't have footer, use size match
+                'footer_found': not truncated,
                 'expected_size': expected_size,
                 'actual_size': len(wav_content),
                 'truncated': truncated
@@ -573,10 +552,6 @@ class FileCarvingWidget(QWidget):
 
     def carve_mov_files(self, chunk, global_offset):
         mov_signatures = [
-            # b'ftyp', b'moov', b'mdat', #b'pnot', b'udta', #b'uuid',
-            # b'moof', b'free', b'skip', b'jP2 ', b'wide', b'load',
-            # b'ctab', b'imap', b'matt', b'kmat', b'clip', b'crgn',
-            # b'sync', b'chap', b'tmcd', b'scpt', b'ssrc', b'PICT'
             b'moov', b'mdat', b'free', b'wide'
         ]
 
@@ -589,7 +564,6 @@ class FileCarvingWidget(QWidget):
 
         while offset < len(chunk):
             if offset + 8 > len(chunk):
-                # Not enough data for an atom header
                 truncated = mov_file_found
                 break
 
@@ -598,10 +572,8 @@ class FileCarvingWidget(QWidget):
 
             if atom_type not in mov_signatures:
                 if mov_file_found:
-                    # End of MOV file
                     break
                 else:
-                    # Not a MOV file or just a stray header, skip ahead
                     offset += 4
                     continue
 
@@ -609,12 +581,10 @@ class FileCarvingWidget(QWidget):
             mov_file_size += atom_size
 
             if offset + atom_size > len(chunk):
-                # Atom extends beyond this chunk, store what we have
                 mov_data += chunk[offset:]
                 truncated = True
                 break
             else:
-                # We have the whole atom, store it
                 mov_data += chunk[offset:offset + atom_size]
 
             offset += atom_size
@@ -628,7 +598,6 @@ class FileCarvingWidget(QWidget):
                 'truncated': truncated
             }
 
-            # Validate MOV file before saving
             if self.is_valid_file(mov_data, 'mov'):
                 self.save_file(mov_data, 'mov', 'carved_files', mov_file_offset, carving_meta)
 
@@ -643,20 +612,17 @@ class FileCarvingWidget(QWidget):
         current_offset = 0
 
         while current_offset < len(chunk):
-            # Look for ftyp atom which typically starts MP4 files
             ftyp_index = chunk.find(ftyp_signature, current_offset + 4, current_offset + 1024)
 
             if ftyp_index == -1:
                 current_offset += 1024 if current_offset + 1024 < len(chunk) else len(chunk)
                 continue
 
-            # Check if there's an atom size before ftyp (ftyp should be at offset+4)
             potential_start = ftyp_index - 4
             if potential_start < 0:
                 current_offset = ftyp_index + 4
                 continue
 
-            # Verify it's a valid ftyp atom
             if potential_start + 8 > len(chunk):
                 break
 
@@ -667,7 +633,6 @@ class FileCarvingWidget(QWidget):
                 current_offset = ftyp_index + 4
                 continue
 
-            # Check for MP4 brand indicators in ftyp atom
             if potential_start + 12 <= len(chunk):
                 brand = chunk[potential_start + 8:potential_start + 12]
                 mp4_brands = [b'isom', b'mp41', b'mp42', b'avc1', b'iso2', b'M4V ', b'M4A ',
@@ -677,7 +642,6 @@ class FileCarvingWidget(QWidget):
                     current_offset = ftyp_index + 4
                     continue
 
-            # Found valid MP4 ftyp atom, now collect all atoms
             mp4_data = b''
             mp4_offset = potential_start
             parse_offset = potential_start
@@ -692,43 +656,34 @@ class FileCarvingWidget(QWidget):
                 atom_size = int.from_bytes(chunk[parse_offset:parse_offset + 4], 'big')
                 atom_type = chunk[parse_offset + 4:parse_offset + 8]
 
-                # Check if this is a valid MP4 atom
                 if atom_type not in mp4_atoms:
-                    # Reached end of MP4 file
                     break
 
                 expected_total_size += atom_size
 
-                # Check atom size validity
                 if atom_size < 8 or atom_size > len(chunk) - parse_offset:
                     if atom_type == b'mdat' and atom_size == 1:
-                        # Extended size atom (64-bit size)
                         if parse_offset + 16 <= len(chunk):
                             atom_size = int.from_bytes(chunk[parse_offset + 8:parse_offset + 16], 'big')
                         else:
                             truncated = True
                             break
                     else:
-                        # Invalid atom or extends beyond chunk
                         if len(mp4_data) > 0:
                             truncated = True
                             break
                         else:
-                            # Skip this potential MP4
                             current_offset = ftyp_index + 4
                             break
 
-                # Add atom data
                 if parse_offset + atom_size <= len(chunk):
                     mp4_data += chunk[parse_offset:parse_offset + atom_size]
                     parse_offset += atom_size
                 else:
-                    # Atom extends beyond chunk
                     mp4_data += chunk[parse_offset:]
                     truncated = True
                     break
 
-            # Save MP4 file if we collected data
             if len(mp4_data) > 0:
                 carving_meta = {
                     'header_found': True,
@@ -760,26 +715,23 @@ class FileCarvingWidget(QWidget):
                 jpg_content = chunk[start_index:end_index + len(jpg_end_signature)]
                 offset = end_index + len(jpg_end_signature)
             else:
-                # No footer found - carve up to end of chunk (truncated)
                 jpg_content = chunk[start_index:]
                 offset = len(chunk)
 
-            # Capture carving metadata
             carving_meta = {
                 'header_found': True,
                 'footer_found': footer_found,
-                'expected_size': None,  # JPG has no size field
+                'expected_size': None,
                 'actual_size': len(jpg_content),
                 'truncated': not footer_found
             }
 
-            # Check if it's a valid JPG file
             if self.is_valid_file(jpg_content, 'jpg'):
                 self.save_file(jpg_content, 'jpg', 'carved_files',
                                global_offset + start_index, carving_meta)
 
             if not footer_found:
-                break  # Stop if truncated
+                break
 
     def carve_gif_files(self, chunk, global_offset):
         gif_start_signature = b'\x47\x49\x46\x38'
@@ -800,7 +752,6 @@ class FileCarvingWidget(QWidget):
                 gif_content = chunk[start_index:]
                 offset = len(chunk)
 
-            # Capture carving metadata
             carving_meta = {
                 'header_found': True,
                 'footer_found': footer_found,
@@ -809,7 +760,6 @@ class FileCarvingWidget(QWidget):
                 'truncated': not footer_found
             }
 
-            # Check if it's a valid GIF file
             if self.is_valid_file(gif_content, 'gif'):
                 self.save_file(gif_content, 'gif', 'carved_files',
                                global_offset + start_index, carving_meta)
@@ -836,7 +786,6 @@ class FileCarvingWidget(QWidget):
                 png_content = chunk[start_index:]
                 offset = len(chunk)
 
-            # Capture carving metadata
             carving_meta = {
                 'header_found': True,
                 'footer_found': footer_found,
@@ -845,7 +794,6 @@ class FileCarvingWidget(QWidget):
                 'truncated': not footer_found
             }
 
-            # Check if it's a valid PNG file
             if self.is_valid_file(png_content, 'png'):
                 self.save_file(png_content, 'png', 'carved_files',
                                global_offset + start_index, carving_meta)
@@ -854,18 +802,15 @@ class FileCarvingWidget(QWidget):
                 break
 
     def carve_wmv_files(self, chunk, global_offset):
-        # Define ASF header signature
         asf_header_signature = b'\x30\x26\xB2\x75\x8E\x66\xCF\x11\xA6\xD9\x00\xAA\x00\x62\xCE\x6C'
 
         current_offset = 0
 
         while current_offset < len(chunk):
-            # Search for ASF header
             start_index = chunk.find(asf_header_signature, current_offset)
             if start_index == -1:
                 break
 
-            # Find the file properties object header within the first 512 bytes of the file
             max_search_size = min(start_index + 512, len(chunk))
             file_properties_header = b'\xA1\xDC\xAB\x8C\x47\xA9\xCF\x11\x8E\xE4\x00\xC0\x0C\x20\x53\x65'
             file_properties_index = chunk.find(file_properties_header, start_index, max_search_size)
@@ -873,16 +818,13 @@ class FileCarvingWidget(QWidget):
                 current_offset = start_index + 1
                 continue
 
-            # Extract the file size located at offset 40 within the object
             file_size_offset = file_properties_index + 40
             file_size_bytes = chunk[file_size_offset:file_size_offset + 8]
             expected_size = int.from_bytes(file_size_bytes, byteorder='little')
 
-            # Calculate end index based on file size
             end_index = start_index + expected_size
             truncated = end_index > len(chunk)
 
-            # Extract WMV content
             if truncated:
                 wmv_content = chunk[start_index:]
             else:
@@ -896,23 +838,20 @@ class FileCarvingWidget(QWidget):
                 'truncated': truncated
             }
 
-            # Validate WMV file before saving
             if self.is_valid_file(wmv_content, 'wmv'):
                 self.save_file(wmv_content, 'wmv', 'carved_files',
                                global_offset + start_index, carving_meta)
             current_offset = end_index if not truncated else len(chunk)
 
     def carve_zip_files(self, chunk, global_offset):
-        # Define ZIP header signatures
         local_file_header_signature = b'\x50\x4b\x03\x04'
         end_of_central_dir_signature = b'\x50\x4b\x05\x06'
 
         current_pos = 0
-        zip_file_parts = []  # List to hold all parts of the ZIP file
+        zip_file_parts = []
         start_offset = None
 
         while current_pos < len(chunk):
-            # Search for local file header
             local_header_index = chunk.find(local_file_header_signature, current_pos)
             if local_header_index == -1:
                 break
@@ -920,33 +859,25 @@ class FileCarvingWidget(QWidget):
             if start_offset is None:
                 start_offset = local_header_index
 
-            # Extract compressed size from local file header
             compressed_size = struct.unpack("<I", chunk[local_header_index + 18:local_header_index + 22])[0]
 
-            # Calculate next local file header index
             next_local_header_index = local_header_index + 30 + compressed_size
 
-            # Extract file content
             file_content = chunk[local_header_index:next_local_header_index]
-            zip_file_parts.append(file_content)  # Add the file content to the ZIP parts list
+            zip_file_parts.append(file_content)
 
-            # Move to next local file header
             current_pos = next_local_header_index
 
-        # Now, find and append the Central Directory and End of Central Directory Record
         end_central_dir_index = chunk.find(end_of_central_dir_signature, current_pos)
         eocd_found = end_central_dir_index != -1
 
         if eocd_found:
-            # Extract comment length and calculate the total end of the ZIP file structure
             comment_length = struct.unpack("<H", chunk[end_central_dir_index + 20:end_central_dir_index + 22])[0]
             zip_end = end_central_dir_index + 22 + comment_length
 
-            # Extract the Central Directory and End of Central Directory Record
             zip_file_structure = chunk[current_pos:zip_end]
-            zip_file_parts.append(zip_file_structure)  # Add this to the ZIP parts list
+            zip_file_parts.append(zip_file_structure)
 
-        # Combine all parts into a single ZIP file content
         if zip_file_parts:
             complete_zip_file_content = b''.join(zip_file_parts)
 
@@ -958,7 +889,6 @@ class FileCarvingWidget(QWidget):
                 'truncated': not eocd_found
             }
 
-            # Validate ZIP file before saving
             if self.is_valid_file(complete_zip_file_content, 'zip'):
                 self.save_file(complete_zip_file_content, 'zip', 'carved_files',
                                global_offset + (start_offset or 0), carving_meta)
@@ -966,38 +896,31 @@ class FileCarvingWidget(QWidget):
         return None
 
     def carve_bmp_files(self, chunk, global_offset):
-        bmp_start_signature = b'BM'  # BMP files start with 'BM'
-        header_size = 14  # The static header size for BMP files
+        bmp_start_signature = b'BM'
+        header_size = 14
 
         current_offset = 0
         while current_offset < len(chunk) - header_size:
-            # Look for the BMP signature
             start_index = chunk.find(bmp_start_signature, current_offset)
             if start_index == -1:
-                break  # No more BMP files found
+                break
 
-            # Verify there's enough chunk left to read the BMP size
             if start_index + header_size > len(chunk) - 4:
-                break  # Not enough data for size
+                break
 
-            # Read file size directly from header
             expected_size = int.from_bytes(chunk[start_index + 2:start_index + 6], byteorder='little')
 
-            # Sanity check for BMP size (adjust max and min size as per your need)
             if expected_size < 100 or expected_size > 5000000:
                 current_offset = start_index + 2
-                continue  # Not a valid BMP size, skip to next possible start
+                continue
 
-            # Read and check dimensions for further validation
             bmp_width = int.from_bytes(chunk[start_index + 18:start_index + 22], byteorder='little')
             bmp_height = int.from_bytes(chunk[start_index + 22:start_index + 26], byteorder='little')
 
-            # Reasonable dimensions check (adjust max width/height as per your need)
             if bmp_width <= 0 or bmp_width > 10000 or bmp_height <= 0 or bmp_height > 10000:
                 current_offset = start_index + 2
-                continue  # Unreasonable dimensions, likely not a BMP
+                continue
 
-            # Extract the BMP file
             truncated = start_index + expected_size > len(chunk)
             if not truncated:
                 bmp_content = chunk[start_index:start_index + expected_size]
@@ -1008,13 +931,12 @@ class FileCarvingWidget(QWidget):
 
             carving_meta = {
                 'header_found': True,
-                'footer_found': not truncated,  # BMP has no footer, use size match
+                'footer_found': not truncated,
                 'expected_size': expected_size,
                 'actual_size': len(bmp_content),
                 'truncated': truncated
             }
 
-            # Validate BMP file before saving
             if self.is_valid_file(bmp_content, 'bmp'):
                 self.save_file(bmp_content, 'bmp', 'carved_files',
                                global_offset + start_index, carving_meta)
@@ -1022,7 +944,6 @@ class FileCarvingWidget(QWidget):
             if truncated:
                 break
 
-        # Return if more data is needed or if processing is complete
         return None
 
     def carve_office_files(self, chunk, global_offset, target_type=None):
@@ -1033,19 +954,16 @@ class FileCarvingWidget(QWidget):
             global_offset: Offset in the image
             target_type: Specific type to carve ('docx', 'xlsx', 'pptx'), or None for all
         """
-        # Office files are ZIP archives with specific internal structure
         local_file_header_signature = b'\x50\x4b\x03\x04'
         end_of_central_dir_signature = b'\x50\x4b\x05\x06'
 
         current_pos = 0
 
         while current_pos < len(chunk):
-            # Find ZIP header (Office files are ZIP archives)
             start_index = chunk.find(local_file_header_signature, current_pos)
             if start_index == -1:
                 break
 
-            # Find end of ZIP file
             end_central_dir_index = chunk.find(end_of_central_dir_signature, start_index)
             eocd_found = end_central_dir_index != -1
 
@@ -1053,7 +971,6 @@ class FileCarvingWidget(QWidget):
                 current_pos = start_index + 4
                 continue
 
-            # Calculate end of file including comment
             try:
                 comment_length = struct.unpack("<H", chunk[end_central_dir_index + 20:end_central_dir_index + 22])[0]
                 zip_end = end_central_dir_index + 22 + comment_length
@@ -1061,13 +978,10 @@ class FileCarvingWidget(QWidget):
                 current_pos = start_index + 4
                 continue
 
-            # Extract potential Office file
             office_content = chunk[start_index:zip_end]
 
-            # Determine if it's an Office file and what type
             office_type = self.identify_and_validate_office_file(office_content)
 
-            # Only save if it matches the target type (or no target specified)
             if office_type:
                 if target_type is None or office_type == target_type:
                     carving_meta = {
@@ -1095,60 +1009,39 @@ class FileCarvingWidget(QWidget):
             str: File type ('docx', 'xlsx', 'pptx') if identifiable, None otherwise
         """
         try:
-            # Try to open as ZIP - this will fail if file is corrupted
             zip_file = zipfile.ZipFile(io.BytesIO(content))
 
-            # FORENSIC MODE: Don't reject corrupted files, try to identify them anyway
-            # Test the ZIP file integrity
-            # if zip_file.testzip() is not None:
-            #     # File is corrupted - but we still try to identify it
-            #     pass
 
             file_list = zip_file.namelist()
 
-            # Required files for each Office type
             docx_required = ['[Content_Types].xml', 'word/document.xml']
             xlsx_required = ['[Content_Types].xml', 'xl/workbook.xml']
             pptx_required = ['[Content_Types].xml', 'ppt/presentation.xml']
 
-            # Check for DOCX
             if all(f in file_list for f in docx_required):
-                # Validate by checking Content_Types.xml
                 try:
                     content_types = zip_file.read('[Content_Types].xml').decode('utf-8', errors='ignore')
                     if 'wordprocessingml' in content_types:
-                        # FORENSIC MODE: Don't verify readability, just identify
-                        # zip_file.read('word/document.xml')
                         return 'docx'
                 except:
-                    # FORENSIC MODE: If structure looks like DOCX, save it anyway
                     return 'docx'
 
-            # Check for XLSX
             elif all(f in file_list for f in xlsx_required):
                 try:
                     content_types = zip_file.read('[Content_Types].xml').decode('utf-8', errors='ignore')
                     if 'spreadsheetml' in content_types:
-                        # FORENSIC MODE: Don't verify readability, just identify
-                        # zip_file.read('xl/workbook.xml')
                         return 'xlsx'
                 except:
-                    # FORENSIC MODE: If structure looks like XLSX, save it anyway
                     return 'xlsx'
 
-            # Check for PPTX
             elif all(f in file_list for f in pptx_required):
                 try:
                     content_types = zip_file.read('[Content_Types].xml').decode('utf-8', errors='ignore')
                     if 'presentationml' in content_types:
-                        # FORENSIC MODE: Don't verify readability, just identify
-                        # zip_file.read('ppt/presentation.xml')
                         return 'pptx'
                 except:
-                    # FORENSIC MODE: If structure looks like PPTX, save it anyway
                     return 'pptx'
 
-            # If it has [Content_Types].xml but doesn't match above, check content
             elif '[Content_Types].xml' in file_list:
                 try:
                     content_types = zip_file.read('[Content_Types].xml').decode('utf-8', errors='ignore')
@@ -1161,13 +1054,11 @@ class FileCarvingWidget(QWidget):
                 except:
                     pass
 
-            return None  # Not a valid Office file
+            return None
 
         except zipfile.BadZipFile:
-            # Corrupted ZIP file
             return None
         except Exception as e:
-            # Any other error means invalid file
             return None
 
     def carve_files(self, selected_file_types):
@@ -1187,7 +1078,6 @@ class FileCarvingWidget(QWidget):
                     self.stop_button.setEnabled(False)
                     return
 
-                # Call the carve function for each selected file type
                 for file_type in selected_file_types:
                     if file_type == 'all':
                         self.carve_wav_files(chunk, offset)
@@ -1200,7 +1090,7 @@ class FileCarvingWidget(QWidget):
                         self.carve_wmv_files(chunk, offset)
                         self.carve_zip_files(chunk, offset)
                         self.carve_bmp_files(chunk, offset)
-                        self.carve_office_files(chunk, offset, target_type=None)  # Carve all office types
+                        self.carve_office_files(chunk, offset, target_type=None)
                     elif file_type == 'wav':
                         self.carve_wav_files(chunk, offset)
                     elif file_type == 'mov':
@@ -1232,7 +1122,6 @@ class FileCarvingWidget(QWidget):
         finally:
             self.start_button.setEnabled(True)
             self.stop_button.setEnabled(False)
-            # Update the summary bar with carving statistics
             self.update_summary_bar()
 
     def update_summary_bar(self):
@@ -1242,7 +1131,6 @@ class FileCarvingWidget(QWidget):
             self.summary_bar.setVisible(False)
             return
 
-        # Build summary text with colored tier counts
         parts = [f"Carved {total} files: "]
         tier_parts = []
 
@@ -1263,7 +1151,6 @@ class FileCarvingWidget(QWidget):
         self.summary_bar.setVisible(True)
 
     def save_file(self, file_content, file_type, file_path, offset, carving_meta=None):
-        # Ensure the 'carved_files' directory exists
         if not os.path.exists("carved_files"):
             os.makedirs("carved_files")
 
@@ -1275,17 +1162,14 @@ class FileCarvingWidget(QWidget):
         modification_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         file_size = str(len(file_content))
 
-        # Calculate confidence score
         confidence_result = self.confidence_evaluator.evaluate(
             file_path, file_type, carving_meta or {}, file_content
         )
 
-        # Update carving statistics
         tier_key = confidence_result.tier.lower()
         if tier_key in self.carving_stats:
             self.carving_stats[tier_key] += 1
 
-        # Format details for tooltip
         confidence_details = '\n'.join(confidence_result.details)
 
         self.carved_files.append((file_name, file_size, file_type, file_path,
@@ -1298,15 +1182,15 @@ class FileCarvingWidget(QWidget):
         """Get QColor for confidence score based on tier."""
         from PySide6.QtGui import QColor
         if score >= 90:
-            return QColor('#4CAF50')  # Green - Complete
+            return QColor('#4CAF50')
         elif score >= 70:
-            return QColor('#8BC34A')  # Light Green - Good
+            return QColor('#8BC34A')
         elif score >= 50:
-            return QColor('#FFC107')  # Yellow - Partial
+            return QColor('#FFC107')
         elif score >= 30:
-            return QColor('#FF9800')  # Orange - Damaged
+            return QColor('#FF9800')
         else:
-            return QColor('#F44336')  # Red - Fragment
+            return QColor('#F44336')
 
     def get_confidence_tier_name(self, score):
         """Get tier name for confidence score."""
@@ -1325,44 +1209,36 @@ class FileCarvingWidget(QWidget):
         """Add a confidence badge overlay to a pixmap thumbnail."""
         from PySide6.QtGui import QColor, QFont, QPen, QBrush
 
-        # Check if pixmap is valid
         if pixmap.isNull() or pixmap.width() <= 0 or pixmap.height() <= 0:
-            return pixmap  # Return original if invalid
+            return pixmap
 
-        # Create a copy of the pixmap to draw on
         result = QPixmap(pixmap.size())
         result.fill(Qt.transparent)
 
         painter = QPainter()
         if not painter.begin(result):
-            return pixmap  # Return original if painter fails to start
+            return pixmap
 
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # Draw the original pixmap
         painter.drawPixmap(0, 0, pixmap)
 
-        # Get tier color
         color = self.get_confidence_color(confidence_score)
 
-        # Draw colored border around the thumbnail based on confidence
         border_width = 3
         pen = QPen(color, border_width)
         painter.setPen(pen)
         painter.drawRect(border_width // 2, border_width // 2,
                          pixmap.width() - border_width, pixmap.height() - border_width)
 
-        # Draw confidence badge in top-right corner
         badge_size = 32
         badge_x = pixmap.width() - badge_size - 4
         badge_y = 4
 
-        # Badge background circle
         painter.setPen(Qt.NoPen)
         painter.setBrush(QBrush(color))
         painter.drawEllipse(badge_x, badge_y, badge_size, badge_size)
 
-        # Badge text
         painter.setPen(Qt.white)
         font = QFont()
         font.setPixelSize(11)
@@ -1381,13 +1257,11 @@ class FileCarvingWidget(QWidget):
         readable_size = self.image_handler.get_readable_size(int(size))
         self.table_widget.insertRow(row)
 
-        # Set Id column manually
-        self.table_widget.setItem(row, 0, QTableWidgetItem(str(row + 1)))  # Setting the 'Id' field
+        self.table_widget.setItem(row, 0, QTableWidgetItem(str(row + 1)))
         self.table_widget.setItem(row, 1, QTableWidgetItem(name))
         self.table_widget.setItem(row, 2, NumericTableWidgetItem(readable_size))
         self.table_widget.setItem(row, 3, QTableWidgetItem(type_))
 
-        # Confidence column with color coding
         confidence_item = QTableWidgetItem(f"{confidence_score}%")
         confidence_item.setTextAlignment(Qt.AlignCenter)
         confidence_item.setToolTip(confidence_details)
@@ -1397,42 +1271,38 @@ class FileCarvingWidget(QWidget):
         self.table_widget.setItem(row, 5, QTableWidgetItem(modification_date))
         self.table_widget.setItem(row, 6, QTableWidgetItem(file_path))
 
-        # Set column resize modes
         header = self.table_widget.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Fixed)  # Id column fixed width
-        header.setSectionResizeMode(1, QHeaderView.Stretch)  # Name column stretches dynamically
-        header.setSectionResizeMode(2, QHeaderView.Fixed)  # Size column fixed width
-        header.setSectionResizeMode(3, QHeaderView.Fixed)  # Type column fixed width
-        header.setSectionResizeMode(4, QHeaderView.Fixed)  # Confidence column fixed width
-        header.setSectionResizeMode(5, QHeaderView.Fixed)  # Date column fixed width
-        header.setSectionResizeMode(6, QHeaderView.Stretch)  # File Path column stretches dynamically
+        header.setSectionResizeMode(0, QHeaderView.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.Fixed)
+        header.setSectionResizeMode(5, QHeaderView.Fixed)
+        header.setSectionResizeMode(6, QHeaderView.Stretch)
 
-        # Set fixed widths for non-stretch columns
-        self.table_widget.setColumnWidth(0, 30)  # Id column width
-        self.table_widget.setColumnWidth(2, 70)  # Size column width
-        self.table_widget.setColumnWidth(3, 50)  # Type column width
-        self.table_widget.setColumnWidth(4, 80)  # Confidence column width
-        self.table_widget.setColumnWidth(5, 130)  # Date column width
+        self.table_widget.setColumnWidth(0, 30)
+        self.table_widget.setColumnWidth(2, 70)
+        self.table_widget.setColumnWidth(3, 50)
+        self.table_widget.setColumnWidth(4, 80)
+        self.table_widget.setColumnWidth(5, 130)
 
-        # Only proceed if the file type is one of the supported image, video, or office formats
         if type_.lower() in ['jpg', 'jpeg', 'png', 'gif', 'mov', 'mp4', 'pdf', 'wmv', 'bmp', 'docx', 'xlsx', 'pptx']:
             file_full_path = os.path.join("carved_files", name)
-            thumbnail_folder = os.path.join("carved_files", "thumbnails")  # Folder to save thumbnails
+            thumbnail_folder = os.path.join("carved_files", "thumbnails")
 
             if not os.path.exists(thumbnail_folder):
-                os.makedirs(thumbnail_folder)  # Create the thumbnail folder if it doesn't exist
+                os.makedirs(thumbnail_folder)
 
             if type_.lower() == 'mov':
                 thumbnail_path = os.path.join(thumbnail_folder, name.replace('.mov', '.png'))
                 with VideoFileClip(file_full_path) as clip:
-                    clip.save_frame(thumbnail_path, t=0.5)  # save frame at 0.5 seconds
+                    clip.save_frame(thumbnail_path, t=0.5)
                 pixmap = QPixmap(thumbnail_path)
 
             elif type_.lower() == 'mp4':
-                # Extract thumbnail from MP4 using cv2
                 capture = cv2.VideoCapture(file_full_path)
                 success, image = capture.read()
-                capture.release()  # Release the capture object explicitly
+                capture.release()
                 if success:
                     thumbnail_path = os.path.join(thumbnail_folder, name.replace('.mp4', '.png'))
                     cv2.imwrite(thumbnail_path, image)
@@ -1441,17 +1311,15 @@ class FileCarvingWidget(QWidget):
                     print("Failed to extract thumbnail from MP4 file")
 
             elif type_.lower() == 'pdf':
-                # Convert the first page of the PDF to a thumbnail
                 images = convert_from_path(file_full_path)
                 thumbnail_path = os.path.join(thumbnail_folder, name.replace('.pdf', '.png'))
                 images[0].save(thumbnail_path, 'PNG')
-                # Create the QPixmap from the full path
                 pixmap = QPixmap(thumbnail_path)
 
             elif type_.lower() == 'wmv':
                 capture = cv2.VideoCapture(file_full_path)
                 success, image = capture.read()
-                capture.release()  # Release the capture object explicitly
+                capture.release()
                 if success:
                     thumbnail_path = os.path.join(thumbnail_folder, name.replace('.wmv', '.png'))
                     cv2.imwrite(thumbnail_path, image)
@@ -1460,7 +1328,6 @@ class FileCarvingWidget(QWidget):
                     print("Failed to extract thumbnail from WMV file")
 
             elif type_.lower() in ['docx', 'xlsx', 'pptx']:
-                # For office files, use generic icons
                 icon_map = {
                     'docx': 'Icons/file-types/word-icon.png',
                     'xlsx': 'Icons/file-types/excel-icon.png',
@@ -1468,9 +1335,7 @@ class FileCarvingWidget(QWidget):
                 }
                 icon_path = icon_map.get(type_.lower(), 'Icons/file-types/office-icon.png')
 
-                # Check if icon exists, otherwise use a default
                 if not os.path.exists(icon_path):
-                    # Create a simple colored square as a placeholder
                     color_map = {
                         'docx': Qt.blue,
                         'xlsx': Qt.darkGreen,
@@ -1480,7 +1345,6 @@ class FileCarvingWidget(QWidget):
                     color = color_map.get(type_.lower(), Qt.gray)
                     pixmap.fill(color)
 
-                    # Add text label
                     painter = QPainter(pixmap)
                     painter.setPen(Qt.white)
                     painter.drawText(pixmap.rect(), Qt.AlignCenter, type_.upper())
@@ -1489,25 +1353,19 @@ class FileCarvingWidget(QWidget):
                     pixmap = QPixmap(icon_path)
 
             else:
-                # For image files, use the original file path
                 thumbnail_path = file_full_path
                 pixmap = QPixmap(thumbnail_path)
 
-            # Scale the pixmap to the icon size while maintaining aspect ratio
             pixmap = pixmap.scaled(QSize(150, 150), Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-            # Add confidence badge overlay to thumbnail
             pixmap = self.add_confidence_badge(pixmap, confidence_score)
 
             icon = QIcon(pixmap)
 
-            # Create a QListWidgetItem, set its icon, and provide a size hint to ensure the text is visible
             item = QListWidgetItem(icon, name)
-            # Set a fixed size for the QListWidgetItem with some extra space for the text
-            item.setSizeHint(QSize(200, 200))  # Adjust the width as necessary to fit the text
+            item.setSizeHint(QSize(200, 200))
             item.setToolTip(f"Confidence: {confidence_score}%\n{confidence_details}")
 
-            # Store file data in the item for preview functionality
             item_data = {
                 "name": name,
                 "type": "file",
@@ -1520,10 +1378,8 @@ class FileCarvingWidget(QWidget):
             }
             item.setData(Qt.UserRole, item_data)
 
-            # Set the item flags to not be movable and to be selectable
             item.setFlags(item.flags() & ~Qt.ItemIsDragEnabled & ~Qt.ItemIsDropEnabled)
 
-            # Add the QListWidgetItem to the list widget
             self.list_widget.addItem(item)
 
     def clear(self):
@@ -1542,53 +1398,42 @@ class FileCarvingWidget(QWidget):
 
     def on_carved_file_clicked(self, row, column):
         """Handle click on carved file to show preview in viewer tabs."""
-        # Get the file path from the table (column 6 - after adding Confidence column)
-        file_path_item = self.table_widget.item(row, 6)  # File Path column
+        file_path_item = self.table_widget.item(row, 6)
         if not file_path_item:
             return
 
         file_path = file_path_item.text()
 
-        # Check if file exists
         if not os.path.exists(file_path):
             print(f"Carved file not found: {file_path}")
             return
 
         try:
-            # Read the carved file content
             with open(file_path, 'rb') as f:
                 file_content = f.read()
 
-            # Get file name and type for metadata
-            file_name = self.table_widget.item(row, 1).text()  # Name column
-            file_type = self.table_widget.item(row, 3).text()  # Type column
+            file_name = self.table_widget.item(row, 1).text()
+            file_type = self.table_widget.item(row, 3).text()
 
-            # Create data dict similar to what the tree viewer uses
             file_data = {
                 "name": file_name,
                 "type": "file",
                 "size": len(file_content),
                 "file_type": file_type,
                 "path": file_path,
-                "is_carved": True  # Flag to indicate this is a carved file
+                "is_carved": True
             }
 
-            # Get reference to mainwindow
             if self.main_window and hasattr(self.main_window, 'update_viewer_with_file_content'):
-                # Clear existing viewers
                 if hasattr(self.main_window, 'clear_viewers'):
                     self.main_window.clear_viewers()
 
-                # Store file content for tab switching
                 self.main_window.current_file_content = file_content
 
-                # Update the current selected data
                 self.main_window.current_selected_data = file_data
 
-                # Display in viewer tabs
                 self.main_window.update_viewer_with_file_content(file_content, file_data)
 
-                # Make sure viewer tabs are visible
                 if hasattr(self.main_window, 'viewer_dock'):
                     self.main_window.viewer_dock.show()
 
@@ -1603,42 +1448,32 @@ class FileCarvingWidget(QWidget):
 
     def on_carved_list_item_clicked(self, item):
         """Handle click on carved file in list/icon view to show preview."""
-        # Get the file path stored in the item data
         file_data = item.data(Qt.UserRole)
         if not file_data or 'path' not in file_data:
             return
 
         file_path = file_data['path']
 
-        # Check if file exists
         if not os.path.exists(file_path):
             print(f"Carved file not found: {file_path}")
             return
 
         try:
-            # Read the carved file content
             with open(file_path, 'rb') as f:
                 file_content = f.read()
 
-            # Use the file_data from the item
             file_data['is_carved'] = True
 
-            # Get reference to mainwindow
             if self.main_window and hasattr(self.main_window, 'update_viewer_with_file_content'):
-                # Clear existing viewers
                 if hasattr(self.main_window, 'clear_viewers'):
                     self.main_window.clear_viewers()
 
-                # Store file content for tab switching
                 self.main_window.current_file_content = file_content
 
-                # Update the current selected data
                 self.main_window.current_selected_data = file_data
 
-                # Display in viewer tabs
                 self.main_window.update_viewer_with_file_content(file_content, file_data)
 
-                # Make sure viewer tabs are visible
                 if hasattr(self.main_window, 'viewer_dock'):
                     self.main_window.viewer_dock.show()
 
@@ -1652,21 +1487,17 @@ class FileCarvingWidget(QWidget):
             traceback.print_exc()
 
     def handle_resize_event(self, event):
-        # Calculate total width of the table
         total_width = self.table_widget.width()
 
-        # Fixed columns: Id, Size, Type, Confidence, Date
-        fixed_width = (self.table_widget.columnWidth(0) +  # Id
-                       self.table_widget.columnWidth(2) +  # Size
-                       self.table_widget.columnWidth(3) +  # Type
-                       self.table_widget.columnWidth(4) +  # Confidence
-                       self.table_widget.columnWidth(5))   # Date
+        fixed_width = (self.table_widget.columnWidth(0) +
+                       self.table_widget.columnWidth(2) +
+                       self.table_widget.columnWidth(3) +
+                       self.table_widget.columnWidth(4) +
+                       self.table_widget.columnWidth(5))
 
-        # Remaining space for dynamic columns
         remaining_width = total_width - fixed_width
 
-        # Allocate remaining space proportionally
-        self.table_widget.setColumnWidth(1, remaining_width // 2)  # Name column
-        self.table_widget.setColumnWidth(6, remaining_width // 2)  # File Path column
+        self.table_widget.setColumnWidth(1, remaining_width // 2)
+        self.table_widget.setColumnWidth(6, remaining_width // 2)
 
         super(QTableWidget, self.table_widget).resizeEvent(event)

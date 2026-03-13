@@ -18,7 +18,6 @@ from .base import (
 from .common import create_hashers, finalize_hashes, get_logger, ProgressTracker
 
 
-# Windows API constants
 GENERIC_READ = 0x80000000
 FILE_SHARE_READ = 0x00000001
 FILE_SHARE_WRITE = 0x00000002
@@ -366,19 +365,16 @@ class WindowsAcquirer(BaseAcquirer):
         actual_device_path = device_path
 
         try:
-            # Parse device path - check if it's a drive number
             if device_path.isdigit():
                 drive_number = int(device_path)
                 handle, actual_device_path, error_msg = self._open_device_with_fallback(
                     drive_number=drive_number
                 )
             elif device_path.endswith(':') or (len(device_path) == 1 and device_path.isalpha()):
-                # Drive letter
                 handle, actual_device_path, error_msg = self._open_device_with_fallback(
                     drive_letter=device_path
                 )
             else:
-                # Direct device path
                 handle, actual_device_path, error_msg = self._open_device_with_fallback(
                     device_path=device_path
                 )
@@ -388,7 +384,6 @@ class WindowsAcquirer(BaseAcquirer):
 
             self.logger.info(f"Device opened successfully: {actual_device_path}")
 
-            # Try to get disk size
             total_size = None
             try:
                 file_size = ctypes.c_ulonglong(0)
@@ -400,7 +395,6 @@ class WindowsAcquirer(BaseAcquirer):
             except Exception as e:
                 self.logger.warning(f"Could not get device size: {e}")
 
-            # Open output file
             self.logger.info(f"Writing to: {output_path}")
             out_file = open(output_path, 'wb')
 
@@ -408,7 +402,6 @@ class WindowsAcquirer(BaseAcquirer):
             bytes_read_ct = ctypes.c_ulong()
             bytes_written = 0
 
-            # Stream loop
             while True:
                 if abort_check and abort_check():
                     self.logger.warning("Acquisition aborted by user")
@@ -430,7 +423,7 @@ class WindowsAcquirer(BaseAcquirer):
 
                 if not success:
                     error_code = ctypes.windll.kernel32.GetLastError()
-                    if error_code in [38, 27]:  # EOF codes
+                    if error_code in [38, 27]:
                         self.logger.info(f"Reached end of device (error code {error_code})")
                         break
                     else:
@@ -456,13 +449,11 @@ class WindowsAcquirer(BaseAcquirer):
                     stats = tracker.update(bytes_written)
                     progress_callback(bytes_written, total_size, stats['speed_mbps'])
 
-            # Cleanup
             out_file.close()
             out_file = None
             ctypes.windll.kernel32.CloseHandle(handle)
             handle = None
 
-            # Final stats
             final_stats = tracker.update(bytes_written)
             final_stats = tracker.get_final_stats()
 
@@ -531,7 +522,6 @@ class WindowsAcquirer(BaseAcquirer):
 
         self.logger.info("DRY-RUN MODE: Checking device access...")
 
-        # Parse device path
         if device_path.isdigit():
             handle, actual_path, error_msg = self._open_device_with_fallback(
                 drive_number=int(device_path)
@@ -550,7 +540,6 @@ class WindowsAcquirer(BaseAcquirer):
 
         self.logger.info(f"Device opened successfully: {actual_path}")
 
-        # Try to get size
         total_size = None
         size_available = False
         try:

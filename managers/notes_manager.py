@@ -76,10 +76,8 @@ class NotesManager:
         """
         self.db_path = db_path
 
-        # Ensure directory exists
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-        # Initialize database
         self._init_database()
 
     def _init_database(self):
@@ -87,7 +85,6 @@ class NotesManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Notes table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS notes (
                 note_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,7 +100,6 @@ class NotesManager:
             )
         ''')
 
-        # Index for faster lookups
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_artifact
             ON notes(artifact_type, artifact_id)
@@ -126,18 +122,16 @@ class NotesManager:
         cursor = conn.cursor()
 
         try:
-            # Check if note exists for this artifact
             existing = self.get_note_for_artifact(note.artifact_type, note.artifact_id)
 
             if existing:
-                # Update existing note
                 cursor.execute('''
                     UPDATE notes
                     SET content = ?, edited = ?, timestamp = ?, tags = ?
                     WHERE artifact_type = ? AND artifact_id = ?
                 ''', (
                     note.content,
-                    1 if note.ai_generated else 0,  # Mark as edited if updating AI note
+                    1 if note.ai_generated else 0,
                     datetime.now().isoformat(),
                     json.dumps(note.tags),
                     note.artifact_type,
@@ -145,7 +139,6 @@ class NotesManager:
                 ))
                 note_id = existing.note_id
             else:
-                # Insert new note
                 cursor.execute('''
                     INSERT INTO notes
                     (artifact_type, artifact_id, artifact_name, content,
@@ -331,7 +324,6 @@ class NotesManager:
         return counts
 
 
-# Singleton instance
 _notes_manager = None
 
 def get_notes_manager() -> NotesManager:

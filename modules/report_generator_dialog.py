@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
 
 from modules.forensic_report_generator import ForensicReportGenerator
 
-# Import notes manager
 try:
     from managers.notes_manager import get_notes_manager
     NOTES_AVAILABLE = True
@@ -34,9 +33,9 @@ except ImportError:
 class ReportGeneratorThread(QThread):
     """Background thread for report generation."""
 
-    progress = Signal(str)  # Progress message
-    finished = Signal(dict)  # Result dictionary
-    error = Signal(str)  # Error message
+    progress = Signal(str)
+    finished = Signal(dict)
+    error = Signal(str)
 
     def __init__(self, config):
         """
@@ -53,7 +52,6 @@ class ReportGeneratorThread(QThread):
         try:
             self.progress.emit("Initializing report generator...")
 
-            # Create generator
             generator = ForensicReportGenerator(
                 case_id=self.config['case_id'],
                 operator=self.config['operator'],
@@ -66,19 +64,15 @@ class ReportGeneratorThread(QThread):
                 logfile=self.config.get('logfile')
             )
 
-            # Add notes if provided
             if self.config.get('notes'):
                 generator.notes = self.config['notes']
 
-            # Add investigator notes if provided
             if self.config.get('investigator_notes'):
-                # Append investigator notes to existing notes
                 if generator.notes:
                     generator.notes += "\n\n---\n\n## INVESTIGATOR NOTES\n\n" + self.config['investigator_notes']
                 else:
                     generator.notes = "## INVESTIGATOR NOTES\n\n" + self.config['investigator_notes']
 
-            # Inject session data if provided
             session_data = self.config.get('session_data')
             if session_data:
                 self.progress.emit(f"DEBUG: Session data present: has_data={session_data.get('has_data')}, total_files={session_data.get('total_files', 0)}")
@@ -86,14 +80,12 @@ class ReportGeneratorThread(QThread):
             if session_data and session_data.get('has_data'):
                 self.progress.emit("Loading files from ForensAI session...")
 
-                # Import ArtifactInfo class
                 from modules.forensic_report_generator import ArtifactInfo
                 from datetime import datetime, timezone
 
                 files_to_load = session_data.get('files', [])
                 self.progress.emit(f"DEBUG: Found {len(files_to_load)} files in session data")
 
-                # Convert session files to ArtifactInfo objects
                 for idx, file_info in enumerate(files_to_load):
                     try:
                         artifact = ArtifactInfo(
@@ -104,10 +96,8 @@ class ReportGeneratorThread(QThread):
                         )
                         artifact.inode = file_info.get('inode', '')
 
-                        # Parse timestamps if available
                         try:
                             if file_info.get('created'):
-                                # Timestamps from ForensAI might be in various formats
                                 artifact.created_utc = datetime.now(timezone.utc)
                         except:
                             pass
@@ -118,19 +108,16 @@ class ReportGeneratorThread(QThread):
                         except:
                             pass
 
-                        # Check if notable
                         generator._check_notable(artifact)
 
                         generator.artifacts.append(artifact)
 
-                        # Progress update every 100 files
                         if (idx + 1) % 100 == 0:
                             self.progress.emit(f"Loaded {idx + 1} files...")
                     except Exception as e:
                         self.progress.emit(f"DEBUG: Error loading file {idx}: {e}")
                         continue
 
-                # Update statistics
                 generator.stats['total_files'] = len(generator.artifacts)
                 generator.stats['total_size'] = session_data.get('total_size', 0)
                 generator.stats['notable_artifacts'] = sum(1 for a in generator.artifacts if a.notable_reasons)
@@ -140,14 +127,12 @@ class ReportGeneratorThread(QThread):
             else:
                 self.progress.emit("DEBUG: No session data to load (will scan artifacts directory instead)")
 
-            # Inject risk scan results if available
             if session_data and session_data.get('risk_scan_results'):
                 self.progress.emit(f"Loading {len(session_data['risk_scan_results'])} risk scan results...")
                 generator.set_risk_scan_results(session_data['risk_scan_results'])
 
             self.progress.emit("Verifying master image...")
 
-            # Generate report
             result = generator.generate_report(
                 formats=self.config['formats'],
                 include_screenshots=self.config.get('include_screenshots', False)
@@ -186,11 +171,9 @@ class ReportGeneratorDialog(QDialog):
 
         self.init_ui()
 
-        # Pre-fill with current image if available
         if self.current_image_path:
             self.master_image_edit.setText(self.current_image_path)
 
-        # Trigger checkbox toggle to set initial state
         if hasattr(self, 'use_session_checkbox'):
             self.on_session_checkbox_toggled(self.use_session_checkbox.isChecked())
 
@@ -200,7 +183,6 @@ class ReportGeneratorDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        # Title
         title = QLabel("Forensic Evidence Report Generator")
         title.setFont(QFont("Arial", 18, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
@@ -212,7 +194,6 @@ class ReportGeneratorDialog(QDialog):
         subtitle.setStyleSheet("color: #7f8c8d; font-size: 12px; padding-bottom: 10px;")
         layout.addWidget(subtitle)
 
-        # Create scroll area for form
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.NoFrame)
@@ -222,7 +203,6 @@ class ReportGeneratorDialog(QDialog):
         form_layout.setSpacing(15)
         form_layout.setContentsMargins(10, 10, 10, 10)
 
-        # Add global styling
         groupbox_style = """
             QGroupBox {
                 font-weight: bold;
@@ -240,7 +220,6 @@ class ReportGeneratorDialog(QDialog):
             }
         """
 
-        # Input field styling
         input_style = """
             QLineEdit {
                 padding: 8px;
@@ -254,7 +233,6 @@ class ReportGeneratorDialog(QDialog):
             }
         """
 
-        # Browse button styling
         browse_button_style = """
             QPushButton {
                 background-color: #ecf0f1;
@@ -275,7 +253,6 @@ class ReportGeneratorDialog(QDialog):
             }
         """
 
-        # === Required Information ===
         required_group = QGroupBox("Required Information")
         required_group.setStyleSheet(groupbox_style)
         required_layout = QFormLayout()
@@ -284,20 +261,16 @@ class ReportGeneratorDialog(QDialog):
         required_layout.setVerticalSpacing(12)
         required_layout.setHorizontalSpacing(15)
 
-        # Case ID
         self.case_id_edit = QLineEdit()
         self.case_id_edit.setStyleSheet(input_style)
         self.case_id_edit.setPlaceholderText("e.g., CASE-2025-001")
-        # Auto-generate case ID suggestion
         suggested_id = f"CASE-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}"
         self.case_id_edit.setText(suggested_id)
         required_layout.addRow("Case ID:", self.case_id_edit)
 
-        # Operator Name
         self.operator_edit = QLineEdit()
         self.operator_edit.setStyleSheet(input_style)
         self.operator_edit.setPlaceholderText("e.g., John Doe")
-        # Try to get username from environment
         import getpass
         try:
             username = getpass.getuser()
@@ -306,7 +279,6 @@ class ReportGeneratorDialog(QDialog):
             pass
         required_layout.addRow("Operator Name:", self.operator_edit)
 
-        # Master Image
         master_layout = QHBoxLayout()
         master_layout.setSpacing(8)
         self.master_image_edit = QLineEdit()
@@ -319,7 +291,6 @@ class ReportGeneratorDialog(QDialog):
         master_layout.addWidget(master_browse_btn)
         required_layout.addRow("Master Image:", master_layout)
 
-        # Output Directory
         output_layout = QHBoxLayout()
         output_layout.setSpacing(8)
         self.output_dir_edit = QLineEdit()
@@ -335,7 +306,6 @@ class ReportGeneratorDialog(QDialog):
         required_group.setLayout(required_layout)
         form_layout.addWidget(required_group)
 
-        # === Optional Information ===
         optional_group = QGroupBox("Optional Information (Enhances Report)")
         optional_group.setStyleSheet(groupbox_style)
         optional_layout = QFormLayout()
@@ -344,7 +314,6 @@ class ReportGeneratorDialog(QDialog):
         optional_layout.setVerticalSpacing(12)
         optional_layout.setHorizontalSpacing(15)
 
-        # Derived ISO
         derived_layout = QHBoxLayout()
         derived_layout.setSpacing(8)
         self.derived_iso_edit = QLineEdit()
@@ -357,7 +326,6 @@ class ReportGeneratorDialog(QDialog):
         derived_layout.addWidget(derived_browse_btn)
         optional_layout.addRow("Derived ISO:", derived_layout)
 
-        # Artifacts Directory
         artifacts_layout = QHBoxLayout()
         artifacts_layout.setSpacing(8)
         self.artifacts_dir_edit = QLineEdit()
@@ -370,7 +338,6 @@ class ReportGeneratorDialog(QDialog):
         artifacts_layout.addWidget(artifacts_browse_btn)
         optional_layout.addRow("Artifacts Directory:", artifacts_layout)
 
-        # Bulk Extractor Directory
         bulk_layout = QHBoxLayout()
         bulk_layout.setSpacing(8)
         self.bulk_extractor_edit = QLineEdit()
@@ -383,7 +350,6 @@ class ReportGeneratorDialog(QDialog):
         bulk_layout.addWidget(bulk_browse_btn)
         optional_layout.addRow("Bulk Extractor:", bulk_layout)
 
-        # Logfile
         logfile_layout = QHBoxLayout()
         logfile_layout.setSpacing(8)
         self.logfile_edit = QLineEdit()
@@ -399,13 +365,11 @@ class ReportGeneratorDialog(QDialog):
         optional_group.setLayout(optional_layout)
         form_layout.addWidget(optional_group)
 
-        # === Current Session Data ===
         session_group = QGroupBox("ForensAI Current Session Data")
         session_group.setStyleSheet(groupbox_style)
         session_layout = QVBoxLayout()
         session_layout.setSpacing(10)
 
-        # Show session data info
         if self.session_data and self.session_data.get('has_data'):
             info_label = QLabel(
                 f"✅ ForensAI has <b>{self.session_data['total_files']:,} files</b> loaded from current evidence image.<br>"
@@ -415,11 +379,10 @@ class ReportGeneratorDialog(QDialog):
             info_label.setStyleSheet("color: #28a745; padding: 10px; background-color: #d4edda; border-radius: 5px;")
             session_layout.addWidget(info_label)
 
-            # Checkbox to use current session
             self.use_session_checkbox = QCheckBox(
                 "Use files from current ForensAI session (recommended)"
             )
-            self.use_session_checkbox.setChecked(True)  # Default to using session data
+            self.use_session_checkbox.setChecked(True)
             self.use_session_checkbox.setStyleSheet("font-weight: bold;")
             self.use_session_checkbox.toggled.connect(self.on_session_checkbox_toggled)
             session_layout.addWidget(self.use_session_checkbox)
@@ -431,7 +394,6 @@ class ReportGeneratorDialog(QDialog):
             session_layout.addWidget(note_label)
 
         else:
-            # No session data available
             warning_label = QLabel(
                 "⚠️ No files currently loaded in ForensAI.<br>"
                 "Load an evidence image first (File → Add Evidence File) to include parsed files in the report."
@@ -448,13 +410,11 @@ class ReportGeneratorDialog(QDialog):
         session_group.setLayout(session_layout)
         form_layout.addWidget(session_group)
 
-        # === Report Options ===
         options_group = QGroupBox("Report Options")
         options_group.setStyleSheet(groupbox_style)
         options_layout = QVBoxLayout()
         options_layout.setSpacing(12)
 
-        # Output formats
         formats_label = QLabel("Output Formats:")
         formats_label.setFont(QFont("Arial", 10, QFont.Bold))
         options_layout.addWidget(formats_label)
@@ -473,17 +433,14 @@ class ReportGeneratorDialog(QDialog):
         formats_container.addStretch()
         options_layout.addLayout(formats_container)
 
-        # PDF note
         pdf_note = QLabel("📝 Note: PDF generation requires wkhtmltopdf or weasyprint")
         pdf_note.setStyleSheet("color: #666; font-size: 10px; font-style: italic;")
         options_layout.addWidget(pdf_note)
 
-        # Include screenshots
         self.screenshots_checkbox = QCheckBox("Include screenshots in report")
         self.screenshots_checkbox.setChecked(False)
         options_layout.addWidget(self.screenshots_checkbox)
 
-        # Case Notes
         notes_label = QLabel("Case Notes (optional):")
         notes_label.setFont(QFont("Arial", 10, QFont.Bold))
         options_layout.addWidget(notes_label)
@@ -502,7 +459,6 @@ class ReportGeneratorDialog(QDialog):
         scroll.setWidget(form_widget)
         layout.addWidget(scroll)
 
-        # === Progress Area ===
         self.progress_group = QGroupBox("Progress")
         self.progress_group.setStyleSheet(groupbox_style)
         progress_layout = QVBoxLayout()
@@ -523,7 +479,7 @@ class ReportGeneratorDialog(QDialog):
         progress_layout.addWidget(self.progress_text)
 
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # Indeterminate
+        self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(False)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
@@ -542,7 +498,6 @@ class ReportGeneratorDialog(QDialog):
         self.progress_group.setVisible(False)
         layout.addWidget(self.progress_group)
 
-        # === Buttons ===
         button_layout = QHBoxLayout()
         button_layout.setSpacing(15)
         button_layout.setContentsMargins(0, 15, 0, 0)
@@ -658,13 +613,11 @@ class ReportGeneratorDialog(QDialog):
     def on_session_checkbox_toggled(self, checked):
         """Handle session checkbox toggle."""
         if checked:
-            # Disable artifacts directory field when using session data
             self.artifacts_dir_edit.setEnabled(False)
             self.artifacts_dir_edit.setPlaceholderText(
                 "Using files from ForensAI session (see above)"
             )
         else:
-            # Re-enable artifacts directory field
             self.artifacts_dir_edit.setEnabled(True)
             self.artifacts_dir_edit.setPlaceholderText(
                 "Directory containing extracted artifacts"
@@ -677,7 +630,6 @@ class ReportGeneratorDialog(QDialog):
         Returns:
             Tuple of (valid: bool, error_message: str)
         """
-        # Check required fields
         if not self.case_id_edit.text().strip():
             return False, "Case ID is required"
 
@@ -698,13 +650,11 @@ class ReportGeneratorDialog(QDialog):
         if not output_dir:
             return False, "Output directory is required"
 
-        # Check at least one format is selected
         if not (self.html_checkbox.isChecked() or
                 self.json_checkbox.isChecked() or
                 self.pdf_checkbox.isChecked()):
             return False, "Please select at least one output format"
 
-        # Validate optional paths if provided
         derived_iso = self.derived_iso_edit.text().strip()
         if derived_iso and not os.path.exists(derived_iso):
             return False, f"Derived ISO not found: {derived_iso}"
@@ -725,13 +675,11 @@ class ReportGeneratorDialog(QDialog):
 
     def generate_report(self):
         """Generate forensic report."""
-        # Validate inputs
         valid, error_msg = self.validate_inputs()
         if not valid:
             QMessageBox.warning(self, "Validation Error", error_msg)
             return
 
-        # Confirm generation
         reply = QMessageBox.question(
             self,
             "Confirm Report Generation",
@@ -744,14 +692,12 @@ class ReportGeneratorDialog(QDialog):
         if reply != QMessageBox.Yes:
             return
 
-        # Collect investigator notes from notes manager
         investigator_notes = []
         if NOTES_AVAILABLE:
             try:
                 notes_mgr = get_notes_manager()
                 all_notes = notes_mgr.get_all_notes()
 
-                # Group notes by type
                 notes_by_type = {}
                 for note in all_notes:
                     artifact_type = note.artifact_type
@@ -759,7 +705,6 @@ class ReportGeneratorDialog(QDialog):
                         notes_by_type[artifact_type] = []
                     notes_by_type[artifact_type].append(note)
 
-                # Format notes for report
                 for artifact_type, notes in notes_by_type.items():
                     investigator_notes.append(f"\n### {artifact_type.upper()} ARTIFACTS\n")
                     for note in notes:
@@ -771,7 +716,6 @@ class ReportGeneratorDialog(QDialog):
             except Exception as e:
                 print(f"Warning: Could not load investigator notes: {e}")
 
-        # Prepare configuration
         config = {
             'case_id': self.case_id_edit.text().strip(),
             'operator': self.operator_edit.text().strip(),
@@ -785,20 +729,17 @@ class ReportGeneratorDialog(QDialog):
             'investigator_notes': '\n'.join(investigator_notes) if investigator_notes else None,
             'include_screenshots': self.screenshots_checkbox.isChecked(),
             'formats': [],
-            'session_data': None  # Will be filled if using session
+            'session_data': None
         }
 
-        # Check if using session data
         if hasattr(self, 'use_session_checkbox') and self.use_session_checkbox.isChecked():
             if self.session_data and self.session_data.get('has_data'):
-                # Pass session data to thread
                 config['session_data'] = self.session_data
                 self.progress_text.append(
                     f"[{datetime.now().strftime('%H:%M:%S')}] "
                     f"Using {self.session_data['total_files']:,} files from ForensAI session"
                 )
 
-        # Collect selected formats
         if self.html_checkbox.isChecked():
             config['formats'].append('html')
         if self.json_checkbox.isChecked():
@@ -806,17 +747,14 @@ class ReportGeneratorDialog(QDialog):
         if self.pdf_checkbox.isChecked():
             config['formats'].append('pdf')
 
-        # Show progress UI
         self.progress_group.setVisible(True)
         self.progress_bar.setVisible(True)
         self.progress_text.clear()
         self.progress_text.append(f"[{datetime.now().strftime('%H:%M:%S')}] Starting report generation...")
 
-        # Disable generate button
         self.generate_btn.setEnabled(False)
         self.generate_btn.setText("Generating...")
 
-        # Create and start background thread
         self.generator_thread = ReportGeneratorThread(config)
         self.generator_thread.progress.connect(self.update_progress)
         self.generator_thread.finished.connect(self.generation_complete)
@@ -827,7 +765,6 @@ class ReportGeneratorDialog(QDialog):
         """Update progress display."""
         timestamp = datetime.now().strftime('%H:%M:%S')
         self.progress_text.append(f"[{timestamp}] {message}")
-        # Auto-scroll to bottom
         self.progress_text.verticalScrollBar().setValue(
             self.progress_text.verticalScrollBar().maximum()
         )
@@ -838,9 +775,7 @@ class ReportGeneratorDialog(QDialog):
         self.generate_btn.setEnabled(True)
         self.generate_btn.setText("Generate Report")
 
-        # Show result
         if result['status'] in ['success', 'partial']:
-            # Build success message
             message = f"Report generated successfully!\n\n"
             message += f"Case ID: {result['case_id']}\n"
             message += f"Status: {result['status'].upper()}\n\n"
@@ -867,12 +802,10 @@ class ReportGeneratorDialog(QDialog):
             msg_box.setText(message)
             msg_box.setStandardButtons(QMessageBox.Ok)
 
-            # Add button to open report directory
             open_btn = msg_box.addButton("Open Report Folder", QMessageBox.ActionRole)
 
             msg_box.exec_()
 
-            # Check if user clicked "Open Report Folder"
             if msg_box.clickedButton() == open_btn:
                 import subprocess
                 import platform
@@ -883,15 +816,13 @@ class ReportGeneratorDialog(QDialog):
                 else:
                     output_dir = self.output_dir_edit.text().strip()
 
-                # Open folder in file explorer
                 if platform.system() == 'Windows':
                     os.startfile(output_dir)
-                elif platform.system() == 'Darwin':  # macOS
+                elif platform.system() == 'Darwin':
                     subprocess.call(['open', output_dir])
-                else:  # Linux
+                else:
                     subprocess.call(['xdg-open', output_dir])
         else:
-            # Show error
             error_msg = f"Report generation failed!\n\n{result['summary']}"
             if result.get('warnings'):
                 error_msg += "\n\nDetails:\n"

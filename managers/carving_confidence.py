@@ -34,22 +34,21 @@ except ImportError:
 @dataclass
 class ConfidenceResult:
     """Result of confidence evaluation for a carved file."""
-    score: int                          # 0-100 overall confidence
-    structural: int                     # Header/footer integrity (0-100)
-    size_match: int                     # Expected vs actual size (0-100)
-    parsability: int                    # Can file be opened (0-100)
-    tier: str                           # Confidence tier name
-    tier_color: str                     # Color for UI display
-    details: List[str] = field(default_factory=list)  # Human-readable breakdown
+    score: int
+    structural: int
+    size_match: int
+    parsability: int
+    tier: str
+    tier_color: str
+    details: List[str] = field(default_factory=list)
 
 
-# Confidence tier definitions
 CONFIDENCE_TIERS = {
-    'complete': {'min': 90, 'max': 100, 'color': '#4CAF50', 'name': 'Complete'},      # Green
-    'good': {'min': 70, 'max': 89, 'color': '#8BC34A', 'name': 'Good'},               # Light Green
-    'partial': {'min': 50, 'max': 69, 'color': '#FFC107', 'name': 'Partial'},         # Yellow
-    'damaged': {'min': 30, 'max': 49, 'color': '#FF9800', 'name': 'Damaged'},         # Orange
-    'fragment': {'min': 0, 'max': 29, 'color': '#F44336', 'name': 'Fragment'},        # Red
+    'complete': {'min': 90, 'max': 100, 'color': '#4CAF50', 'name': 'Complete'},
+    'good': {'min': 70, 'max': 89, 'color': '#8BC34A', 'name': 'Good'},
+    'partial': {'min': 50, 'max': 69, 'color': '#FFC107', 'name': 'Partial'},
+    'damaged': {'min': 30, 'max': 49, 'color': '#FF9800', 'name': 'Damaged'},
+    'fragment': {'min': 0, 'max': 29, 'color': '#F44336', 'name': 'Fragment'},
 }
 
 
@@ -64,7 +63,6 @@ def get_tier(score: int) -> tuple:
 class CarvingConfidence:
     """Evaluates confidence scores for carved files."""
 
-    # Weight distribution for scoring components
     WEIGHT_STRUCTURAL = 0.40
     WEIGHT_SIZE = 0.30
     WEIGHT_PARSABILITY = 0.30
@@ -106,7 +104,6 @@ class CarvingConfidence:
         metadata = carving_metadata or {}
         details = []
 
-        # Load file content if not provided
         if file_content is None:
             try:
                 with open(file_path, 'rb') as f:
@@ -124,27 +121,22 @@ class CarvingConfidence:
                     details=details
                 )
 
-        # Get type-specific evaluator
         file_type_lower = file_type.lower()
         evaluator = self.evaluators.get(file_type_lower, self._evaluate_generic)
 
-        # Run type-specific evaluation
         structural, size_match, parsability, type_details = evaluator(
             file_content, file_path, metadata
         )
         details.extend(type_details)
 
-        # Calculate weighted overall score
         overall = int(
             structural * self.WEIGHT_STRUCTURAL +
             size_match * self.WEIGHT_SIZE +
             parsability * self.WEIGHT_PARSABILITY
         )
 
-        # Get tier
         tier_name, tier_color = get_tier(overall)
 
-        # Add summary to details
         details.insert(0, f"Overall: {overall}% ({tier_name})")
         details.insert(1, f"Structure: {structural}%, Size: {size_match}%, Parsability: {parsability}%")
 
@@ -163,23 +155,19 @@ class CarvingConfidence:
         """Evaluate JPEG file confidence."""
         details = []
         structural = 0
-        size_match = 100  # JPG has no size field in header
+        size_match = 100
         parsability = 0
 
-        # Structural: Check header and footer
-        # JPG header: FFD8FF
         if content[:3] == b'\xFF\xD8\xFF':
             structural += 25
             details.append("Valid JPEG header (FFD8FF)")
         else:
             details.append("Missing or invalid JPEG header")
 
-        # JPG footer: FFD9
         if content[-2:] == b'\xFF\xD9':
             structural += 75
             details.append("Valid JPEG footer (FFD9)")
         elif b'\xFF\xD9' in content:
-            # Footer present but not at end (embedded data or truncation)
             structural += 50
             details.append("JPEG footer found but not at file end")
         else:
@@ -187,19 +175,16 @@ class CarvingConfidence:
             if metadata.get('truncated'):
                 details.append("File was truncated at chunk boundary")
 
-        # Size match from metadata
         if metadata.get('footer_found') is False:
             size_match = 50
             details.append("No footer found during carving")
 
-        # Parsability: Try to verify with PIL
         try:
             img = Image.open(io.BytesIO(content))
             img.verify()
             parsability = 70
             details.append("PIL verify() passed")
 
-            # Try to actually load it
             img = Image.open(io.BytesIO(content))
             img.load()
             parsability = 100
@@ -217,9 +202,7 @@ class CarvingConfidence:
         size_match = 100
         parsability = 0
 
-        # PNG header: 89 50 4E 47 0D 0A 1A 0A
         png_header = b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'
-        # PNG footer (IEND chunk): 49 45 4E 44 AE 42 60 82
         png_footer = b'\x49\x45\x4E\x44\xAE\x42\x60\x82'
 
         if content[:8] == png_header:
@@ -237,10 +220,8 @@ class CarvingConfidence:
         else:
             details.append("Missing PNG IEND chunk (truncated)")
 
-        # Check IHDR chunk for dimensions
         if len(content) > 24:
             try:
-                # IHDR starts at offset 8, length at 8-12, type at 12-16
                 ihdr_pos = content.find(b'IHDR')
                 if ihdr_pos > 0:
                     width = struct.unpack('>I', content[ihdr_pos + 4:ihdr_pos + 8])[0]
@@ -253,7 +234,6 @@ class CarvingConfidence:
             except Exception:
                 pass
 
-        # Parsability
         try:
             img = Image.open(io.BytesIO(content))
             img.verify()
@@ -277,14 +257,12 @@ class CarvingConfidence:
         size_match = 100
         parsability = 0
 
-        # GIF header: GIF87a or GIF89a
         if content[:6] in (b'GIF87a', b'GIF89a'):
             structural += 40
             details.append(f"Valid GIF header: {content[:6].decode('ascii')}")
         else:
             details.append("Missing or invalid GIF header")
 
-        # GIF trailer: 0x3B (semicolon)
         if content[-1:] == b'\x3B':
             structural += 60
             details.append("Valid GIF trailer (0x3B)")
@@ -294,7 +272,6 @@ class CarvingConfidence:
         else:
             details.append("Missing GIF trailer")
 
-        # Parsability
         try:
             img = Image.open(io.BytesIO(content))
             img.verify()
@@ -318,14 +295,12 @@ class CarvingConfidence:
         size_match = 0
         parsability = 0
 
-        # BMP header: BM
         if content[:2] == b'BM':
             structural += 50
             details.append("Valid BMP header (BM)")
         else:
             details.append("Missing BMP header")
 
-        # BMP has file size in header at offset 2-6
         if len(content) >= 6:
             try:
                 declared_size = struct.unpack('<I', content[2:6])[0]
@@ -346,7 +321,6 @@ class CarvingConfidence:
                 size_match = 50
                 details.append("Could not parse BMP size field")
 
-        # Parsability
         try:
             img = Image.open(io.BytesIO(content))
             img.verify()
@@ -370,7 +344,6 @@ class CarvingConfidence:
         size_match = 100
         parsability = 0
 
-        # PDF header: %PDF-
         if content[:5] == b'%PDF-':
             structural += 25
             version = content[5:8].decode('ascii', errors='ignore')
@@ -378,7 +351,6 @@ class CarvingConfidence:
         else:
             details.append("Missing PDF header")
 
-        # PDF footer: %%EOF
         if b'%%EOF' in content[-1024:]:
             structural += 50
             details.append("Valid PDF trailer (%%EOF)")
@@ -388,12 +360,10 @@ class CarvingConfidence:
         else:
             details.append("Missing PDF trailer")
 
-        # Check for linearization (optimization marker)
         if b'/Linearized' in content[:1024]:
             structural += 25
             details.append("Linearized PDF detected")
 
-            # Try to get /L (file length) value
             try:
                 l_pos = content.find(b'/L ', 0, 2048)
                 if l_pos > 0:
@@ -412,9 +382,8 @@ class CarvingConfidence:
             except Exception:
                 pass
         else:
-            structural += 15  # Non-linearized PDFs are still valid
+            structural += 15
 
-        # Parsability
         if PdfReader is not None:
             try:
                 reader = PdfReader(io.BytesIO(content))
@@ -423,7 +392,6 @@ class CarvingConfidence:
                     parsability = 80
                     details.append(f"PyPDF2 parsed {page_count} pages")
 
-                    # Try to access first page
                     try:
                         first_page = reader.pages[0]
                         _ = first_page.mediabox
@@ -452,7 +420,6 @@ class CarvingConfidence:
         size_match = 100
         parsability = 0
 
-        # MP4 starts with ftyp atom
         if len(content) >= 12:
             atom_type = content[4:8]
             if atom_type == b'ftyp':
@@ -460,7 +427,6 @@ class CarvingConfidence:
                 brand = content[8:12].decode('ascii', errors='ignore')
                 details.append(f"Valid ftyp atom, brand: {brand}")
 
-                # Check for known brands
                 mp4_brands = ['isom', 'mp41', 'mp42', 'avc1', 'iso2', 'M4V ', 'M4A ']
                 if brand in mp4_brands:
                     structural += 30
@@ -471,11 +437,10 @@ class CarvingConfidence:
             else:
                 details.append(f"First atom is {atom_type}, not ftyp")
 
-        # Check for valid atom sequence
         valid_atoms = [b'ftyp', b'moov', b'mdat', b'free', b'skip', b'wide', b'moof', b'uuid']
         atom_count = 0
         offset = 0
-        while offset < min(len(content), 10000):  # Check first 10KB
+        while offset < min(len(content), 10000):
             if offset + 8 > len(content):
                 break
             try:
@@ -493,10 +458,8 @@ class CarvingConfidence:
             structural += 30
             details.append(f"Found {atom_count} valid atoms")
 
-        # Parsability using cv2
         if CV2_AVAILABLE:
             try:
-                # Write to temp and try to read frame
                 import tempfile
                 with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
                     tmp.write(content)
@@ -534,10 +497,8 @@ class CarvingConfidence:
         size_match = 100
         parsability = 0
 
-        # MOV uses QuickTime atom structure
         valid_atoms = [b'ftyp', b'moov', b'mdat', b'free', b'wide', b'skip', b'pnot']
 
-        # Check for valid first atom
         if len(content) >= 8:
             atom_type = content[4:8]
             if atom_type in valid_atoms:
@@ -550,7 +511,6 @@ class CarvingConfidence:
             else:
                 details.append(f"Unexpected first atom: {atom_type}")
 
-        # Check atom sequence integrity
         atom_count = 0
         offset = 0
         total_atom_size = 0
@@ -561,7 +521,7 @@ class CarvingConfidence:
                 atom_size = struct.unpack('>I', content[offset:offset + 4])[0]
                 atom_type = content[offset + 4:offset + 8]
 
-                if atom_size == 0:  # Atom extends to end of file
+                if atom_size == 0:
                     atom_size = len(content) - offset
 
                 if atom_type in valid_atoms:
@@ -587,7 +547,6 @@ class CarvingConfidence:
                 structural += int(30 * coverage)
                 details.append(f"Partial atom coverage: {coverage:.1%}")
 
-        # Parsability
         if CV2_AVAILABLE:
             try:
                 import tempfile
@@ -626,7 +585,6 @@ class CarvingConfidence:
         size_match = 100
         parsability = 0
 
-        # ASF header GUID
         asf_header = b'\x30\x26\xB2\x75\x8E\x66\xCF\x11\xA6\xD9\x00\xAA\x00\x62\xCE\x6C'
 
         if content[:16] == asf_header:
@@ -635,7 +593,6 @@ class CarvingConfidence:
         else:
             details.append("Missing ASF header")
 
-        # Check header object size
         if len(content) >= 24:
             try:
                 header_size = struct.unpack('<Q', content[16:24])[0]
@@ -643,7 +600,6 @@ class CarvingConfidence:
                     structural += 25
                     details.append(f"Header size: {header_size} bytes")
 
-                    # Check for file properties object
                     file_props_guid = b'\xA1\xDC\xAB\x8C\x47\xA9\xCF\x11\x8E\xE4\x00\xC0\x0C\x20\x53\x65'
                     if file_props_guid in content[:min(1024, len(content))]:
                         structural += 25
@@ -651,7 +607,6 @@ class CarvingConfidence:
             except Exception:
                 pass
 
-        # Parsability with cv2
         if CV2_AVAILABLE:
             try:
                 import tempfile
@@ -688,7 +643,6 @@ class CarvingConfidence:
         size_match = 0
         parsability = 0
 
-        # WAV header: RIFF....WAVE
         if content[:4] == b'RIFF':
             structural += 30
             details.append("Valid RIFF header")
@@ -701,7 +655,6 @@ class CarvingConfidence:
         else:
             details.append("Missing WAVE marker")
 
-        # Check file size in header
         if len(content) >= 8:
             try:
                 declared_size = struct.unpack('<I', content[4:8])[0] + 8
@@ -721,17 +674,14 @@ class CarvingConfidence:
             except Exception:
                 size_match = 50
 
-        # Check for fmt chunk
         if b'fmt ' in content[:100]:
             details.append("fmt chunk found")
             parsability += 30
 
-        # Check for data chunk
         if b'data' in content[:1000]:
             details.append("data chunk found")
             parsability += 30
 
-        # Basic parsability - if structure looks good
         if structural >= 60 and size_match >= 70:
             parsability += 40
             details.append("Structure appears valid")
@@ -746,20 +696,17 @@ class CarvingConfidence:
         size_match = 100
         parsability = 0
 
-        # ZIP local file header: PK\x03\x04
         if content[:4] == b'PK\x03\x04':
             structural += 25
             details.append("Valid ZIP local file header (PK)")
         else:
             details.append("Missing ZIP header")
 
-        # End of central directory: PK\x05\x06
         eocd_pos = content.rfind(b'PK\x05\x06')
         if eocd_pos > 0:
             structural += 50
             details.append("End of central directory found")
 
-            # Check file count in EOCD
             if eocd_pos + 22 <= len(content):
                 try:
                     total_entries = struct.unpack('<H', content[eocd_pos + 10:eocd_pos + 12])[0]
@@ -769,19 +716,16 @@ class CarvingConfidence:
         else:
             details.append("Missing end of central directory (truncated)")
 
-        # Central directory: PK\x01\x02
         if b'PK\x01\x02' in content:
             structural += 25
             details.append("Central directory entries found")
 
-        # Parsability
         try:
             zf = zipfile.ZipFile(io.BytesIO(content))
             file_list = zf.namelist()
             parsability = 70
             details.append(f"zipfile opened: {len(file_list)} entries")
 
-            # Test integrity
             bad_file = zf.testzip()
             if bad_file is None:
                 parsability = 100
@@ -802,26 +746,21 @@ class CarvingConfidence:
         """Evaluate Office files (DOCX, XLSX, PPTX) which are ZIP-based."""
         details = []
 
-        # First evaluate as ZIP
         structural, size_match, parsability, zip_details = self._evaluate_zip(
             content, file_path, metadata
         )
 
-        # Add ZIP-level details
         for detail in zip_details:
             details.append(f"[ZIP] {detail}")
 
-        # Now check Office-specific structure
         try:
             zf = zipfile.ZipFile(io.BytesIO(content))
             file_list = zf.namelist()
 
-            # Check for Office markers
             if '[Content_Types].xml' in file_list:
                 structural = min(100, structural + 10)
                 details.append("[Content_Types].xml present")
 
-                # Determine Office type
                 content_types = zf.read('[Content_Types].xml').decode('utf-8', errors='ignore')
 
                 if 'wordprocessingml' in content_types and any('word/' in f for f in file_list):
@@ -850,9 +789,9 @@ class CarvingConfidence:
                           metadata: Dict) -> tuple:
         """Generic evaluation for unknown file types."""
         details = []
-        structural = 50  # Neutral - we can't verify structure
+        structural = 50
         size_match = 100 if not metadata.get('truncated') else 50
-        parsability = 50  # Neutral - we can't test parsability
+        parsability = 50
 
         details.append("Generic file type - limited validation")
 

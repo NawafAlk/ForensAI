@@ -10,7 +10,6 @@ This script tests:
 import sys
 from pathlib import Path
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from managers.ai_service import get_ai_service
@@ -25,7 +24,6 @@ def test_ai_service():
 
     ai_service = get_ai_service()
 
-    # Check if Groq is available
     print("\n1. Checking Groq API connectivity...")
     if ai_service.is_available():
         print("   [OK] Groq API is accessible")
@@ -36,14 +34,13 @@ def test_ai_service():
         print("   - Get a free key at https://console.groq.com")
         return False
 
-    # Test file explanation
     print("\n2. Testing file artifact explanation...")
     test_file = {
         'name': 'pagefile.sys',
         'path': 'C:\\pagefile.sys',
         'type': 'file',
         'mime_type': 'application/octet-stream',
-        'size': 4294967296,  # 4GB
+        'size': 4294967296,
         'created': '2025-01-15 08:23:14 UTC',
         'modified': '2025-01-20 14:32:45 UTC',
         'accessed': '2025-01-20 14:32:45 UTC',
@@ -78,7 +75,6 @@ def test_notes_manager():
 
     notes_mgr = get_notes_manager()
 
-    # Test adding a note
     print("\n1. Creating test note...")
     test_note = Note(
         artifact_type='file',
@@ -92,7 +88,6 @@ def test_notes_manager():
     note_id = notes_mgr.add_note(test_note)
     print(f"   [OK] Note created with ID: {note_id}")
 
-    # Test retrieving the note
     print("\n2. Retrieving note...")
     retrieved = notes_mgr.get_note_for_artifact('file', '12345@2048')
 
@@ -104,12 +99,10 @@ def test_notes_manager():
         print("   [ERROR] Failed to retrieve note")
         return False
 
-    # Test getting all notes
     print("\n3. Getting all notes...")
     all_notes = notes_mgr.get_all_notes()
     print(f"   [OK] Found {len(all_notes)} note(s) in database")
 
-    # Clean up
     print("\n4. Cleaning up test data...")
     notes_mgr.delete_note(note_id)
     print("   [OK] Test note deleted")
@@ -126,15 +119,12 @@ def main():
 
     success = True
 
-    # Test AI service
     if not test_ai_service():
         success = False
 
-    # Test notes manager
     if not test_notes_manager():
         success = False
 
-    # Summary
     print("\n" + "=" * 60)
     print("Test Summary")
     print("=" * 60)

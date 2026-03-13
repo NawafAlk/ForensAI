@@ -28,17 +28,17 @@ from modules.acquire import (
 class AcquisitionThread(QThread):
     """Thread for running disk acquisition without blocking UI."""
 
-    progress_update = Signal(int, int, float)  # bytes_read, total_bytes, speed_mbps
-    acquisition_complete = Signal(dict)  # result dictionary
-    acquisition_error = Signal(str)  # error message
-    log_message = Signal(str)  # log messages
+    progress_update = Signal(int, int, float)
+    acquisition_complete = Signal(dict)
+    acquisition_error = Signal(str)
+    log_message = Signal(str)
 
     def __init__(self, output_path, hash_types, output_format='raw', metadata=None,
                  drive_number=None, drive_letter=None, source_type='physical'):
         super().__init__()
         self.drive_number = drive_number
         self.drive_letter = drive_letter
-        self.source_type = source_type  # 'physical' or 'logical'
+        self.source_type = source_type
         self.output_path = output_path
         self.hash_types = hash_types
         self.output_format = output_format
@@ -48,7 +48,6 @@ class AcquisitionThread(QThread):
     def run(self):
         """Execute the acquisition."""
         try:
-            # Log source information
             if self.source_type == 'physical':
                 self.log_message.emit(f"Starting acquisition of PHYSICALDRIVE{self.drive_number}")
             else:
@@ -67,18 +66,17 @@ class AcquisitionThread(QThread):
                         progress_callback=self._progress_callback,
                         abort_check=self._abort_check,
                         compute_hashes=self.hash_types,
-                        buffer_size=4 * 1024 * 1024,  # 4MB buffer
+                        buffer_size=4 * 1024 * 1024,
                         metadata=self.metadata
                     )
                 else:
-                    # Logical drive acquisition
                     result = acquire_raw_windows(
                         drive_letter=self.drive_letter,
                         output_path=self.output_path,
                         progress_callback=self._progress_callback,
                         abort_check=self._abort_check,
                         compute_hashes=self.hash_types,
-                        buffer_size=4 * 1024 * 1024,  # 4MB buffer
+                        buffer_size=4 * 1024 * 1024,
                         metadata=self.metadata
                     )
             elif self.output_format == 'e01':
@@ -94,14 +92,11 @@ class AcquisitionThread(QThread):
             else:
                 raise AcquisitionError(f"Unknown output format: {self.output_format}")
 
-            # Add metadata
             result.update(self.metadata)
 
-            # Write metadata JSON
             metadata_path = write_metadata_json(self.output_path, result)
             self.log_message.emit(f"\nMetadata written to: {metadata_path}")
 
-            # Write to database
             self._write_to_database(result)
 
             self.acquisition_complete.emit(result)
@@ -130,7 +125,6 @@ class AcquisitionThread(QThread):
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
-            # Create evidence table if it doesn't exist
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS evidence (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,13 +145,11 @@ class AcquisitionThread(QThread):
                 )
             ''')
 
-            # Determine source string based on type
             if self.source_type == 'physical':
                 source_str = f"PHYSICALDRIVE{self.drive_number}"
             else:
                 source_str = f"LogicalDrive:{self.drive_letter}"
 
-            # Insert record
             hashes = result.get('hashes', {})
             cursor.execute('''
                 INSERT INTO evidence (
@@ -198,29 +190,27 @@ class AcquireDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Create Disk Image")
 
-        # Set window flags to allow maximize button and normal window behavior
         self.setWindowFlags(
-            Qt.Window |  # Makes it a proper window
-            Qt.WindowMaximizeButtonHint |  # Adds maximize button
-            Qt.WindowMinimizeButtonHint |  # Adds minimize button
-            Qt.WindowCloseButtonHint  # Adds close button
+            Qt.Window |
+            Qt.WindowMaximizeButtonHint |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowCloseButtonHint
         )
 
         self.setMinimumSize(850, 800)
         self.resize(900, 850)
         self.setModal(True)
 
-        # Make dialog resizable so user can expand log area
         self.setSizeGripEnabled(True)
 
         self.physical_disks = []
         self.logical_drives = []
         self.acquisition_thread = None
-        self.total_bytes_size = 0  # Track total size for consistent progress
-        self.last_bytes_read = 0  # Track last bytes to prevent progress decrease
-        self.last_progress_time = 0  # Track when we last got progress update
-        self.acquisition_finished = False  # Track if acquisition finished
-        self.current_source_type = 'physical'  # 'physical' or 'logical'
+        self.total_bytes_size = 0
+        self.last_bytes_read = 0
+        self.last_progress_time = 0
+        self.acquisition_finished = False
+        self.current_source_type = 'physical'
 
         self.init_ui()
         self.check_prerequisites()
@@ -232,7 +222,6 @@ class AcquireDialog(QDialog):
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        # Global styling
         groupbox_style = """
             QGroupBox {
                 font-weight: bold;
@@ -250,13 +239,11 @@ class AcquireDialog(QDialog):
             }
         """
 
-        # Source type selection group
         source_group = QGroupBox("Select Evidence Source")
         source_group.setStyleSheet(groupbox_style)
         source_layout = QVBoxLayout()
         source_layout.setSpacing(10)
 
-        # Source type radio buttons (like FTK Imager)
         source_type_layout = QHBoxLayout()
         source_type_layout.setSpacing(20)
         self.source_type_group = QButtonGroup()
@@ -276,7 +263,6 @@ class AcquireDialog(QDialog):
         source_type_layout.addStretch()
         source_layout.addLayout(source_type_layout)
 
-        # Combo box style
         combo_style = """
             QComboBox {
                 padding: 8px;
@@ -289,7 +275,6 @@ class AcquireDialog(QDialog):
             }
         """
 
-        # Physical Drive combo
         self.physical_label = QLabel("Physical Drive:")
         self.physical_label.setStyleSheet("font-weight: bold; font-size: 12px;")
         source_layout.addWidget(self.physical_label)
@@ -300,7 +285,6 @@ class AcquireDialog(QDialog):
         self.disk_combo.currentIndexChanged.connect(self.on_disk_selected)
         source_layout.addWidget(self.disk_combo)
 
-        # Logical Drive combo (initially hidden)
         self.logical_label = QLabel("Logical Drive (Volume):")
         self.logical_label.setStyleSheet("font-weight: bold; font-size: 12px;")
         self.logical_label.setVisible(False)
@@ -313,7 +297,6 @@ class AcquireDialog(QDialog):
         self.logical_combo.setVisible(False)
         source_layout.addWidget(self.logical_combo)
 
-        # Source info label
         self.disk_info_label = QLabel("No source selected")
         self.disk_info_label.setWordWrap(True)
         self.disk_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -330,7 +313,6 @@ class AcquireDialog(QDialog):
         source_group.setLayout(source_layout)
         layout.addWidget(source_group)
 
-        # Output settings group
         output_group = QGroupBox("Output Settings")
         output_group.setStyleSheet(groupbox_style)
         output_layout = QFormLayout()
@@ -339,7 +321,6 @@ class AcquireDialog(QDialog):
         output_layout.setVerticalSpacing(12)
         output_layout.setHorizontalSpacing(15)
 
-        # Input field styling
         input_style = """
             QLineEdit {
                 padding: 8px;
@@ -376,7 +357,6 @@ class AcquireDialog(QDialog):
             }
         """
 
-        # Output directory
         output_dir_layout = QHBoxLayout()
         output_dir_layout.setSpacing(8)
         self.output_dir_edit = QLineEdit()
@@ -389,7 +369,6 @@ class AcquireDialog(QDialog):
         output_dir_layout.addWidget(self.output_dir_button)
         output_layout.addRow("Output Directory:", output_dir_layout)
 
-        # Output format
         format_layout = QHBoxLayout()
         format_layout.setSpacing(20)
         self.format_button_group = QButtonGroup()
@@ -403,7 +382,6 @@ class AcquireDialog(QDialog):
         format_layout.addStretch()
         output_layout.addRow("Format:", format_layout)
 
-        # Hash selection
         hash_layout = QHBoxLayout()
         hash_layout.setSpacing(20)
         self.hash_md5 = QCheckBox("MD5")
@@ -417,13 +395,11 @@ class AcquireDialog(QDialog):
         hash_layout.addStretch()
         output_layout.addRow("Compute Hashes:", hash_layout)
 
-        # Operator name
         self.operator_edit = QLineEdit()
         self.operator_edit.setPlaceholderText("Enter your name")
         self.operator_edit.setStyleSheet(input_style)
         output_layout.addRow("Operator:", self.operator_edit)
 
-        # Notes
         self.notes_edit = QLineEdit()
         self.notes_edit.setPlaceholderText("Optional case notes")
         self.notes_edit.setStyleSheet(input_style)
@@ -432,7 +408,6 @@ class AcquireDialog(QDialog):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
 
-        # Confirmation group
         confirm_group = QGroupBox("Confirmation Required")
         confirm_group.setStyleSheet(groupbox_style)
         confirm_layout = QVBoxLayout()
@@ -471,13 +446,11 @@ class AcquireDialog(QDialog):
         confirm_group.setLayout(confirm_layout)
         layout.addWidget(confirm_group)
 
-        # Progress group
         progress_group = QGroupBox("Acquisition Progress")
         progress_group.setStyleSheet(groupbox_style)
         progress_layout = QVBoxLayout()
         progress_layout.setSpacing(10)
 
-        # Progress bar with better styling
         self.progress_bar = QProgressBar()
         self.progress_bar.setMinimum(0)
         self.progress_bar.setMaximum(100)
@@ -514,7 +487,6 @@ class AcquireDialog(QDialog):
         """)
         progress_layout.addWidget(self.progress_label)
 
-        # Log text area
         log_label = QLabel("Log:")
         log_label.setStyleSheet("font-weight: bold; font-size: 12px;")
         progress_layout.addWidget(log_label)
@@ -522,7 +494,7 @@ class AcquireDialog(QDialog):
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setMinimumHeight(120)
-        self.log_text.setMaximumHeight(300)  # Increased from 150 to allow more expansion
+        self.log_text.setMaximumHeight(300)
         self.log_text.setStyleSheet("""
             QTextEdit {
                 border: 1px solid #bdc3c7;
@@ -538,7 +510,6 @@ class AcquireDialog(QDialog):
         progress_group.setLayout(progress_layout)
         layout.addWidget(progress_group)
 
-        # Buttons
         button_layout = QHBoxLayout()
         button_layout.setSpacing(15)
         button_layout.setContentsMargins(0, 10, 0, 0)
@@ -632,7 +603,6 @@ class AcquireDialog(QDialog):
 
     def load_sources(self):
         """Load available physical disks and logical drives."""
-        # Load physical disks
         try:
             self.physical_disks = list_physical_disks_windows()
 
@@ -650,13 +620,11 @@ class AcquireDialog(QDialog):
         except AcquisitionError as e:
             self.log(f"Error loading physical disks: {str(e)}")
 
-        # Load logical drives
         try:
             self.logical_drives = list_logical_drives_windows()
 
             if self.logical_drives:
                 for drive in self.logical_drives:
-                    # Skip drives with no size (like empty CD-ROM)
                     if drive['size'] == 0:
                         continue
                     label = (
@@ -675,21 +643,17 @@ class AcquireDialog(QDialog):
         """Handle source type radio button change."""
         if self.source_physical.isChecked():
             self.current_source_type = 'physical'
-            # Show physical, hide logical
             self.physical_label.setVisible(True)
             self.disk_combo.setVisible(True)
             self.logical_label.setVisible(False)
             self.logical_combo.setVisible(False)
-            # Update info for current selection
             self.on_disk_selected(self.disk_combo.currentIndex())
         else:
             self.current_source_type = 'logical'
-            # Show logical, hide physical
             self.physical_label.setVisible(False)
             self.disk_combo.setVisible(False)
             self.logical_label.setVisible(True)
             self.logical_combo.setVisible(True)
-            # Update info for current selection
             self.on_logical_selected(self.logical_combo.currentIndex())
 
         self.check_can_start()
@@ -714,7 +678,6 @@ class AcquireDialog(QDialog):
         )
         self.disk_info_label.setText(info_text)
 
-        # Update confirmation requirement
         letter = drive['drive_letter'].replace(':', '')
         confirm_string = f"CONFIRM DRIVE {letter}"
         self.confirmation_label.setText(f"Type exactly: {confirm_string}")
@@ -739,7 +702,6 @@ class AcquireDialog(QDialog):
         )
         self.disk_info_label.setText(info_text)
 
-        # Update confirmation requirement
         confirm_string = f"CONFIRM PHYSICALDRIVE{disk['number']}"
         self.confirmation_label.setText(f"Type exactly: {confirm_string}")
         self.confirmation_edit.clear()
@@ -754,7 +716,6 @@ class AcquireDialog(QDialog):
 
     def check_can_start(self):
         """Check if all requirements are met to start acquisition."""
-        # Check based on source type
         if self.current_source_type == 'physical':
             if not self.physical_disks or self.disk_combo.currentIndex() < 0:
                 self.start_button.setEnabled(False)
@@ -765,7 +726,6 @@ class AcquireDialog(QDialog):
                 self.start_button.setEnabled(False)
                 return
 
-            # Check confirmation string for physical drive
             expected_confirm = f"CONFIRM PHYSICALDRIVE{disk['number']}"
         else:
             if not self.logical_drives or self.logical_combo.currentIndex() < 0:
@@ -777,13 +737,11 @@ class AcquireDialog(QDialog):
                 self.start_button.setEnabled(False)
                 return
 
-            # Check confirmation string for logical drive
             letter = drive['drive_letter'].replace(':', '')
             expected_confirm = f"CONFIRM DRIVE {letter}"
 
         actual_confirm = self.confirmation_edit.text().strip()
 
-        # Check output directory
         output_dir = self.output_dir_edit.text().strip()
 
         can_start = (
@@ -796,7 +754,6 @@ class AcquireDialog(QDialog):
 
     def start_acquisition(self):
         """Start the acquisition process."""
-        # Get selected hash types
         hash_types = []
         if self.hash_md5.isChecked():
             hash_types.append('md5')
@@ -809,15 +766,12 @@ class AcquireDialog(QDialog):
             QMessageBox.warning(self, "Warning", "Please select at least one hash type.")
             return
 
-        # Get output format
         output_format = 'raw' if self.format_raw.isChecked() else 'e01'
 
-        # Generate output filename
         timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
         output_dir = self.output_dir_edit.text().strip()
         ext = '.dd' if output_format == 'raw' else '.E01'
 
-        # Prepare based on source type
         if self.current_source_type == 'physical':
             disk = self.disk_combo.currentData()
             if not disk:
@@ -825,7 +779,6 @@ class AcquireDialog(QDialog):
 
             output_path = os.path.join(output_dir, f"physical_drive{disk['number']}_{timestamp}{ext}")
 
-            # Prepare metadata for physical drive
             metadata = {
                 'operator': self.operator_edit.text().strip(),
                 'notes': self.notes_edit.text().strip(),
@@ -836,7 +789,6 @@ class AcquireDialog(QDialog):
                 'source_size_bytes': disk['size']
             }
 
-            # Final confirmation for physical drive
             reply = QMessageBox.question(
                 self,
                 "Confirm Acquisition",
@@ -856,10 +808,8 @@ class AcquireDialog(QDialog):
             if reply != QMessageBox.Yes:
                 return
 
-            # Store size for progress tracking
             self.total_bytes_size = disk['size']
 
-            # Create acquisition thread for physical drive
             self.acquisition_thread = AcquisitionThread(
                 output_path=output_path,
                 hash_types=hash_types,
@@ -869,12 +819,10 @@ class AcquireDialog(QDialog):
                 source_type='physical'
             )
         else:
-            # Logical drive acquisition
             drive = self.logical_combo.currentData()
             if not drive:
                 return
 
-            # E01 not supported for logical drives yet
             if output_format == 'e01':
                 QMessageBox.warning(self, "Warning", "E01 format is not yet supported for logical drives. Please use Raw (.dd) format.")
                 return
@@ -882,7 +830,6 @@ class AcquireDialog(QDialog):
             letter = drive['drive_letter'].replace(':', '')
             output_path = os.path.join(output_dir, f"logical_drive_{letter}_{timestamp}{ext}")
 
-            # Prepare metadata for logical drive
             metadata = {
                 'operator': self.operator_edit.text().strip(),
                 'notes': self.notes_edit.text().strip(),
@@ -895,7 +842,6 @@ class AcquireDialog(QDialog):
                 'source_drive_type': drive['drive_type']
             }
 
-            # Final confirmation for logical drive
             reply = QMessageBox.question(
                 self,
                 "Confirm Acquisition",
@@ -916,10 +862,8 @@ class AcquireDialog(QDialog):
             if reply != QMessageBox.Yes:
                 return
 
-            # Store size for progress tracking
             self.total_bytes_size = drive['size']
 
-            # Create acquisition thread for logical drive
             self.acquisition_thread = AcquisitionThread(
                 output_path=output_path,
                 hash_types=hash_types,
@@ -929,12 +873,10 @@ class AcquireDialog(QDialog):
                 source_type='logical'
             )
 
-        # Common setup
         self.last_bytes_read = 0
         self.last_progress_time = time.time()
         self.acquisition_finished = False
 
-        # Disable controls
         self.disk_combo.setEnabled(False)
         self.logical_combo.setEnabled(False)
         self.source_physical.setEnabled(False)
@@ -944,7 +886,6 @@ class AcquireDialog(QDialog):
         self.abort_button.setEnabled(True)
         self.confirmation_edit.setEnabled(False)
 
-        # Clear log
         self.log_text.clear()
 
         self.acquisition_thread.progress_update.connect(self.on_progress_update)
@@ -974,39 +915,28 @@ class AcquireDialog(QDialog):
         """Handle progress updates."""
         current_time = time.time()
 
-        # Ensure progress never decreases by using max of current and previous
         bytes_read = max(bytes_read, self.last_bytes_read)
 
-        # Detect if we've reached actual end of device (bytes stopped increasing)
-        # If no progress in 3 seconds and speed is very low, device might be done
         if bytes_read == self.last_bytes_read and (current_time - self.last_progress_time) > 3.0:
             if speed_mbps < 0.1 and not self.acquisition_finished:
-                # Device finished early - adjust total to actual bytes read
                 self.total_bytes_size = bytes_read
                 self.log(f"Device read completed at {bytes_read / (1024*1024):.2f} MB (less than reported size)")
 
         self.last_bytes_read = bytes_read
         self.last_progress_time = current_time
 
-        # ALWAYS use stored total_bytes_size for consistent progress calculation
-        # This prevents the bar from showing 100% when device size is unknown
         effective_total = self.total_bytes_size
 
-        # Only use callback total_bytes if we don't have stored size
         if effective_total <= 0:
             effective_total = total_bytes
 
-        # Adaptive: If actual read exceeds stored size, update stored size
-        # This handles cases where device reports larger size than actual data
         if bytes_read > effective_total and effective_total > 0:
             self.total_bytes_size = bytes_read
             effective_total = bytes_read
 
         if effective_total > 0:
-            # Calculate progress and ensure it never exceeds 100%
             progress = min(int((bytes_read / effective_total) * 100), 100)
 
-            # Only update progress bar if new progress is >= current progress
             current_progress = self.progress_bar.value()
             if progress >= current_progress:
                 self.progress_bar.setValue(progress)
@@ -1019,7 +949,6 @@ class AcquireDialog(QDialog):
                 f"Speed: {speed_mbps:.2f} MB/s"
             )
         else:
-            # If we don't have total size, just show bytes read and speed
             mb_read = bytes_read / (1024 * 1024)
             self.progress_label.setText(
                 f"Reading: {mb_read:.2f} MB - Speed: {speed_mbps:.2f} MB/s"
@@ -1027,15 +956,12 @@ class AcquireDialog(QDialog):
 
     def on_acquisition_complete(self, result):
         """Handle acquisition completion."""
-        # Mark acquisition as finished
         self.acquisition_finished = True
 
-        # Update progress label to show completion with actual bytes
         bytes_written = result.get('bytes_written', 0)
         mb_written = bytes_written / (1024 * 1024)
         speed = result.get('speed_mbps', 0)
 
-        # Force progress bar to 100% and update label
         self.progress_bar.setValue(100)
         self.progress_label.setText(
             f"Progress: 100% ({mb_written:.2f} MB / {mb_written:.2f} MB) - "
@@ -1044,7 +970,6 @@ class AcquireDialog(QDialog):
 
         self.abort_button.setEnabled(False)
 
-        # Show results
         hashes = result.get('hashes', {})
         hash_text = '\n'.join([f"{k.upper()}: {v}" for k, v in hashes.items()])
 

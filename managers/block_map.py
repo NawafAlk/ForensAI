@@ -21,21 +21,18 @@ from collections import defaultdict
 class ClusterInfo:
     """Information about a single cluster on disk."""
 
-    cluster_id: int  # Cluster number
-    offset: int  # Byte offset on disk
-    size: int  # Cluster size in bytes
-    status: str = 'unallocated'  # 'allocated', 'unallocated', 'slack', 'metadata'
+    cluster_id: int
+    offset: int
+    size: int
+    status: str = 'unallocated'
 
-    # Current owner (for allocated clusters)
-    owner_now: Optional[str] = None  # "inode:12345" or file path
+    owner_now: Optional[str] = None
     owner_inode: Optional[int] = None
     owner_path: Optional[str] = None
     owner_timestamp: Optional[str] = None
 
-    # Historical owners (for carved/deleted files)
-    owner_past: List[Dict] = field(default_factory=list)  # [{'carved_id': X, 'file_type': 'jpg', ...}]
+    owner_past: List[Dict] = field(default_factory=list)
 
-    # Metadata
     last_modified: Optional[datetime] = None
 
 
@@ -47,24 +44,18 @@ class OverwriteAnalysis:
     recovered_clusters: int
     recovery_percentage: float
 
-    # Files that overwrote this data
-    overwritten_by: List[Tuple[str, str, int]]  # [(filename, timestamp, cluster_count)]
+    overwritten_by: List[Tuple[str, str, int]]
 
-    # Unallocated clusters (not yet overwritten)
     unallocated_clusters: int
 
-    # Fragmentation analysis
-    fragmentation_score: float  # 0-100, higher = more fragmented
-    contiguous_runs: int  # Number of contiguous cluster runs
-    largest_run_size: int  # Size of largest contiguous run
+    fragmentation_score: float
+    contiguous_runs: int
+    largest_run_size: int
 
-    # Timeline of events
-    timeline: List[Dict]  # [{'time': '...', 'event': 'deleted'}, ...]
+    timeline: List[Dict]
 
-    # Summary narrative (for AI to expand)
     summary: str
 
-    # New fields for UI display
     @property
     def clusters_total(self) -> int:
         """Alias for UI consistency."""
@@ -83,7 +74,6 @@ class OverwriteAnalysis:
     @property
     def clusters_wiped(self) -> int:
         """Clusters that were wiped (zeros, patterns)."""
-        # For now, calculate as: total - recovered - reused
         return max(0, self.total_clusters - self.recovered_clusters - self.clusters_reused)
 
     @property
@@ -100,7 +90,7 @@ class OverwriteAnalysis:
 
         if self.clusters_reused > 0:
             lines.append(f"• {self.clusters_reused}/{self.total_clusters} clusters reused by:")
-            for filepath, timestamp, count in self.overwritten_by[:3]:  # Top 3
+            for filepath, timestamp, count in self.overwritten_by[:3]:
                 import os
                 filename = os.path.basename(filepath)
                 lines.append(f"  - {filename} ({count} clusters)")
@@ -115,21 +105,18 @@ class OverwriteAnalysis:
 
     def to_risk_contribution(self) -> int:
         """Calculate risk score contribution from overwrite analysis."""
-        # Base contribution on overwrite percentage
         risk_points = 0
 
         if self.overwrite_risk_pct > 70:
-            risk_points += 30  # Heavy overwriting = high suspicion
+            risk_points += 30
         elif self.overwrite_risk_pct > 40:
             risk_points += 20
         elif self.overwrite_risk_pct > 10:
             risk_points += 10
 
-        # Add points for multiple overwriters (indicates deliberate action)
         if len(self.overwritten_by) > 2:
             risk_points += 15
 
-        # Add points for high fragmentation (unusual)
         if self.fragmentation_score > 60:
             risk_points += 10
 
@@ -168,15 +155,12 @@ class ClusterIndex:
             force_rebuild: Rebuild even if already indexed
         """
         if start_offset in self.indexed_partitions and not force_rebuild:
-            return  # Already indexed
+            return
 
         print(f"Building cluster index for partition at offset {start_offset}...")
 
-        # Step 1: Index allocated files
         self._index_allocated_files(start_offset)
 
-        # Step 2: Mark remaining clusters as unallocated
-        # (This would require reading the allocation bitmap from filesystem)
 
         self.indexed_partitions.add(start_offset)
         print(f"Cluster index built: {len(self.clusters)} clusters tracked")
@@ -197,19 +181,15 @@ class ClusterIndex:
             for entry in entries:
                 entry_name = entry.get("name", "")
 
-                # Skip . and ..
                 if entry_name in [".", ".."]:
                     continue
 
-                # Build full path
                 full_path = f"{path_prefix}/{entry_name}" if path_prefix else entry_name
                 entry_inode = entry.get("inode_number")
 
                 if entry.get("is_directory"):
-                    # Recursively process directory
                     self._index_allocated_files(start_offset, entry_inode, full_path)
                 else:
-                    # Index file clusters
                     self._index_file_clusters(
                         start_offset=start_offset,
                         inode=entry_inode,
@@ -219,7 +199,6 @@ class ClusterIndex:
                     )
 
         except Exception as e:
-            # Continue even if directory read fails
             pass
 
     def _index_file_clusters(self, start_offset: int, inode: int, path: str,
@@ -235,24 +214,12 @@ class ClusterIndex:
             modified: Modification timestamp
         """
         try:
-            # Get file content to understand its cluster allocation
-            # Note: For large files, we'd ideally get just the runlist, not full content
-            # But ImageHandler doesn't expose runlist directly, so we work with what we have
 
-            # Calculate cluster range based on file size
             num_clusters = (size + self.cluster_size - 1) // self.cluster_size
 
             if num_clusters == 0:
                 return
 
-            # For now, we track that this file exists but don't have exact cluster mapping
-            # (Would need pytsk3 file.read_random() with offset to get exact clusters)
-            # Store file metadata for later analysis
-
-            # This is a simplified version - full implementation would:
-            # 1. Get file's data runs from filesystem
-            # 2. Map each run to cluster IDs
-            # 3. Mark those clusters as allocated to this file
 
         except Exception as e:
             pass
@@ -277,7 +244,6 @@ class ClusterIndex:
             cluster_offset = cluster_id * self.cluster_size
 
             if cluster_id not in self.clusters:
-                # Create cluster info
                 self.clusters[cluster_id] = ClusterInfo(
                     cluster_id=cluster_id,
                     offset=cluster_offset,
@@ -286,7 +252,6 @@ class ClusterIndex:
 
             cluster = self.clusters[cluster_id]
 
-            # Add to historical owners
             cluster.owner_past.append({
                 'carved_id': carved_id,
                 'file_type': file_type,
@@ -311,27 +276,23 @@ class ClusterIndex:
         file_type = carved_data.get('file_type', 'unknown')
         deleted_time = carved_data.get('deleted_time')
 
-        # Register this carved file first
         self.add_carved_file(carved_id, file_type, offset, size, deleted_time)
 
-        # Calculate cluster range
         start_cluster = offset // self.cluster_size
         num_clusters = (size + self.cluster_size - 1) // self.cluster_size
 
-        # Analyze each cluster
         recovered = 0
         unallocated = 0
-        overwriters = defaultdict(int)  # filename -> cluster_count
-        overwriter_times = {}  # filename -> timestamp
-        cluster_states = []  # Track state of each cluster for fragmentation
+        overwriters = defaultdict(int)
+        overwriter_times = {}
+        cluster_states = []
 
         for i in range(num_clusters):
             cluster_id = start_cluster + i
 
             if cluster_id not in self.clusters:
-                # Cluster not tracked = likely unallocated
                 unallocated += 1
-                recovered += 1  # Can recover from unallocated
+                recovered += 1
                 cluster_states.append('unallocated')
                 continue
 
@@ -342,31 +303,24 @@ class ClusterIndex:
                 recovered += 1
                 cluster_states.append('unallocated')
             elif cluster.status == 'allocated' and cluster.owner_path:
-                # Overwritten by another file
                 overwriters[cluster.owner_path] += 1
                 overwriter_times[cluster.owner_path] = cluster.owner_timestamp
                 cluster_states.append(f'overwritten:{cluster.owner_path}')
             else:
-                # Unknown status - assume recoverable
                 recovered += 1
                 cluster_states.append('unknown')
 
-        # Calculate fragmentation metrics
         frag_score, contiguous_runs, largest_run = self._calculate_fragmentation(cluster_states)
 
-        # Build overwritten_by list
         overwritten_by = []
         for filepath, cluster_count in overwriters.items():
             timestamp = overwriter_times.get(filepath, 'unknown')
             overwritten_by.append((filepath, timestamp, cluster_count))
 
-        # Sort by cluster count (most overwriting first)
         overwritten_by.sort(key=lambda x: x[2], reverse=True)
 
-        # Calculate recovery percentage
         recovery_pct = (recovered / num_clusters * 100) if num_clusters > 0 else 0
 
-        # Build timeline
         timeline = []
 
         if deleted_time:
@@ -381,7 +335,6 @@ class ClusterIndex:
                 'event': f'{filepath} overwrote {count} clusters ({self._format_size(count * self.cluster_size)})'
             })
 
-        # Generate summary
         if recovery_pct >= 90:
             summary = f"High recovery chance: {recovery_pct:.1f}% of data intact"
         elif recovery_pct >= 50:
@@ -395,7 +348,6 @@ class ClusterIndex:
             top_overwriter = overwritten_by[0][0]
             summary += f". Primary overwriter: {top_overwriter}"
 
-        # Add fragmentation info to summary
         if frag_score > 50:
             summary += f". Highly fragmented ({contiguous_runs} fragments)"
         elif frag_score > 20:
@@ -459,7 +411,6 @@ class ClusterIndex:
         if not cluster_states:
             return 0.0, 0, 0
 
-        # Count contiguous runs of same state
         runs = []
         current_run_state = cluster_states[0]
         current_run_length = 1
@@ -472,28 +423,18 @@ class ClusterIndex:
                 current_run_state = cluster_states[i]
                 current_run_length = 1
 
-        # Add final run
         runs.append((current_run_state, current_run_length))
 
-        # Calculate metrics
         num_runs = len(runs)
         largest_run = max(r[1] for r in runs)
         total_clusters = len(cluster_states)
 
-        # Fragmentation score:
-        # - More runs = higher fragmentation
-        # - Smaller average run size = higher fragmentation
-        # - Ideal (contiguous) = 1 run, score = 0
-        # - Worst case (every cluster different) = N runs, score = 100
 
         if num_runs == 1:
-            frag_score = 0.0  # Perfectly contiguous
+            frag_score = 0.0
         else:
-            # Score based on ratio of runs to total clusters
-            # If every cluster is its own run: num_runs = total_clusters, score = 100
-            # Use logarithmic scaling for better distribution
             run_ratio = num_runs / total_clusters
-            frag_score = min(100.0, run_ratio * 150)  # Scale to 0-100
+            frag_score = min(100.0, run_ratio * 150)
 
         return round(frag_score, 2), num_runs, largest_run
 
@@ -507,7 +448,6 @@ class ClusterIndex:
         return f"{bytes_size:.2f} PB"
 
 
-# Singleton instance per image
 _cluster_indexes: Dict[str, ClusterIndex] = {}
 
 

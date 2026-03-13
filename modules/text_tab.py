@@ -31,8 +31,8 @@ class TextViewerManager:
     PAGE_SIZE = 2000
 
     def __init__(self):
-        self.file_content = b""  # Store raw byte content
-        self.text_content = ""  # This will store the extracted strings
+        self.file_content = b""
+        self.text_content = ""
         self.current_page = 0
         self.encoding = 'utf-8'
         self.last_search_str = ""
@@ -51,21 +51,19 @@ class TextViewerManager:
         return encoding if encoding else 'utf-8'
 
     def extract_strings_from_content(self):
-        encoding = self.detect_encoding(self.file_content[:1024])  # Detect encoding based on the first 1024 bytes
+        encoding = self.detect_encoding(self.file_content[:1024])
         try:
             text = self.file_content.decode(encoding)
         except UnicodeDecodeError:
-            text = self.file_content.decode('ISO-8859-1')  # Fallback to ISO-8859-1 if decoding fails
+            text = self.file_content.decode('ISO-8859-1')
 
-        # Use regex to extract sequences of printable characters (length >= 4)
         strings = re.findall(r"[ -~]{4,}", text)
 
-        # Join the strings with newlines to store them
         self.text_content = "\n".join(strings)
 
     def load_text_content(self, file_content):
         self.file_content = file_content
-        self.extract_strings_from_content()  # Extract printable strings
+        self.extract_strings_from_content()
         self.current_page = 0
 
     def get_text_content_for_current_page(self):
@@ -91,36 +89,31 @@ class TextViewerManager:
             self.page_changed_callback()
 
     def search_for_string(self, search_str, direction=SearchDirection.NEXT):
-        if not search_str:  # If search string is empty, do nothing
+        if not search_str:
             return
 
-        # Only find all occurrences of the search string if the search string has changed
         if self.last_search_str != search_str:
             self.matches = []
             self.current_match_index = -1
 
-            # Find all occurrences of the search string in the text content
             start_idx = 0
             while start_idx < len(self.text_content):
                 idx = self.text_content.find(search_str, start_idx)
                 if idx == -1:
                     break
                 self.matches.append(idx)
-                start_idx = idx + len(search_str)  # Update the start index to the end of the current match
+                start_idx = idx + len(search_str)
 
             self.last_search_str = search_str
 
-        # If no matches were found, return
         if not self.matches:
             return
 
-        # Update the current match index based on the search direction
         if direction == SearchDirection.NEXT:
             self.current_match_index = (self.current_match_index + 1) % len(self.matches)
         else:
             self.current_match_index = (self.current_match_index - 1) % len(self.matches)
 
-        # Update the current page to the page containing the current match
         match_position = self.matches[self.current_match_index]
         self.current_page = match_position // self.PAGE_SIZE
 
@@ -183,7 +176,6 @@ class TextViewer(QWidget):
             action.triggered.connect(handler)
             self.toolbar.addAction(action)
 
-        # add spacer
         spacer = QWidget(self)
         spacer.setFixedSize(50, 0)
         self.toolbar.addWidget(spacer)
@@ -222,10 +214,8 @@ class TextViewer(QWidget):
         self.manager.clear_content()
 
     def search_next(self):
-        # Call the search_for_string method with the updated match index
         self.manager.search_for_string(self.search_input.text(), SearchDirection.NEXT)
 
-        # Update the highlighted text to highlight the current match
         self.update_highlighted_text()
 
     def update_highlighted_text(self):
@@ -265,7 +255,7 @@ class TextViewer(QWidget):
     def refresh_content(self):
         text_content = self.manager.get_text_content_for_current_page()
         self.text_edit.setPlainText(text_content)
-        current_page = self.manager.current_page + 1  # Pages start from 1
+        current_page = self.manager.current_page + 1
         total_pages = self.manager.get_total_pages()
         self.page_entry.setText(str(current_page))
         self.total_pages_label.setText(f" of {total_pages}")
@@ -280,7 +270,6 @@ class CustomTextEdit(QTextEdit):
         menu = self.createStandardContextMenu()
         menu.addSeparator()
 
-        # Define all decoding actions
         decoding_actions = {
             "Decode Base64": self.decodeBase64,
             "Decode Hex": self.decodeHex,
@@ -343,12 +332,10 @@ class CustomTextEdit(QTextEdit):
                 QToolTip.showText(self.mapToGlobal(self.cursorRect().topLeft()), decoded_text)
 
 
-
         except Exception as e:
             QToolTip.showText(self.mapToGlobal(self.cursorRect().topLeft()), f"Invalid {encoding_type.upper()}")
 
     def getDecodedText(self, selected_text):
-        # Attempt decoding in various formats
         decoders = [
             self.tryDecodeBinary,
             self.tryDecodeOctal,
@@ -405,12 +392,11 @@ class CustomTextEdit(QTextEdit):
 
     def mouseMoveEvent(self, event):
         super(CustomTextEdit, self).mouseMoveEvent(event)
-        # Check if there's selected text
         selected_text = self.textCursor().selectedText()
         if selected_text:
             tooltip_text = self.getDecodedText(selected_text)
             if tooltip_text:
                 QToolTip.showText(event.globalPos(), tooltip_text)
         else:
-            QToolTip.hideText()  # Hide any existing tooltip if there's no selection
+            QToolTip.hideText()
 

@@ -11,10 +11,8 @@ import os
 import sys
 from datetime import datetime
 
-# Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Test 1: Confidence & Uncertainty Metrics
 def test_confidence_tracking():
     """Test confidence and uncertainty tracking"""
     print("=" * 70)
@@ -29,11 +27,9 @@ def test_confidence_tracking():
         from managers.risk_scorer import RiskScorer
         from managers.ai_service import LocalAIService
 
-        # Get confidence tracker
         tracker = get_confidence_tracker(case_id="test_high_001")
 
         print("[1] Testing Derived Facts Tracking...")
-        # Create test file data
         test_file = {
             'name': 'important_doc.pdf',
             'path': 'C:/Users/Test/Documents/important_doc.pdf',
@@ -47,23 +43,19 @@ def test_confidence_tracking():
             'mime_type': 'application/pdf'
         }
 
-        # Initialize risk scorer with confidence tracking
         scorer = RiskScorer(
             case_id="test_high_001",
             confidence_tracker=tracker
         )
 
-        # Score file (automatically tracks derived facts)
         risk_score = scorer.score_file(test_file)
 
-        # Check tracked facts
         all_facts = list(tracker.facts.values())
         derived_facts = tracker.get_derived_facts()
 
         print(f"   [OK] Total facts tracked: {len(all_facts)}")
         print(f"   [OK] Derived facts (from evidence): {len(derived_facts)}")
 
-        # Show sample facts
         if derived_facts:
             sample = derived_facts[0]
             print(f"   [OK] Sample derived fact: {sample.description}")
@@ -74,7 +66,6 @@ def test_confidence_tracking():
         print()
         print("[2] Testing AI-Inferred Facts...")
 
-        # Check if Groq API is available
         ai_service = LocalAIService(
             case_id="test_high_001",
             confidence_tracker=tracker
@@ -82,10 +73,8 @@ def test_confidence_tracking():
 
         if ai_service.is_available():
             print("   [OK] Groq API is accessible")
-            # Get AI explanation (automatically tracks inferred facts)
             explanation = ai_service.explain_file_artifact(test_file)
 
-            # Check inferred facts
             inferred_facts = tracker.get_inferred_facts()
             print(f"   [OK] Inferred facts (from AI): {len(inferred_facts)}")
 
@@ -133,7 +122,6 @@ def test_confidence_tracking():
         return False
 
 
-# Test 2: False Positive Protection
 def test_false_positive_protection():
     """Test whitelist, VirusTotal, and PE signature features"""
     print()
@@ -147,11 +135,9 @@ def test_false_positive_protection():
         from managers.virustotal_checker import get_virustotal_checker, VTResult
         from managers.pe_signature_verifier import get_pe_verifier, SignatureInfo
 
-        # Test 2A: Whitelist Manager
         print("[1] Testing Whitelist Manager...")
         whitelist = get_whitelist_manager(case_id="test_high_001")
 
-        # Add test entries
         success = whitelist.add_entry(
             source="custom",
             hash_sha256="a" * 64,
@@ -164,7 +150,6 @@ def test_false_positive_protection():
         )
         print(f"   [OK] Added whitelist entry: {success}")
 
-        # Check file
         test_file = {
             'sha256': "a" * 64,
             'md5': "b" * 32,
@@ -179,35 +164,28 @@ def test_false_positive_protection():
             print(f"        Confidence: {result.confidence * 100:.0f}%")
             print(f"        Matched by: {result.matched_by}")
 
-        # Get statistics
         stats = whitelist.get_statistics()
         print(f"   [OK] Whitelist statistics:")
         for source, count in stats.items():
             print(f"        {source}: {count} entries")
 
-        # Test 2B: VirusTotal Checker
         print()
         print("[2] Testing VirusTotal Integration...")
-        vt_checker = get_virustotal_checker(api_key="")  # No key for testing
+        vt_checker = get_virustotal_checker(api_key="")
 
-        # Test with no API key
         vt_result = vt_checker.check_hash("test_hash_12345")
         print(f"   [OK] VT check (no API key): {vt_result.error}")
 
-        # Note: Full VT testing requires valid API key
         print("   [NOTE] Full VT testing requires valid API key")
         print("          Set VT_API_KEY environment variable for testing")
 
-        # Test 2C: PE Signature Verifier
         print()
         print("[3] Testing PE Signature Verification...")
         pe_verifier = get_pe_verifier()
 
-        # Test with non-existent file
         sig_info = pe_verifier.verify_file("nonexistent.exe")
         print(f"   [OK] PE verification (invalid file): {sig_info.error}")
 
-        # Note: Full PE testing requires actual PE files
         print("   [NOTE] Full PE testing requires actual executable files")
 
         print()
@@ -221,7 +199,6 @@ def test_false_positive_protection():
         return False
 
 
-# Test 3: Explainability Controls
 def test_explainability_controls():
     """Test rule configuration, weight adjustment, and why-not-flagged analysis"""
     print()
@@ -234,7 +211,6 @@ def test_explainability_controls():
         from managers.rule_config_manager import get_rule_config_manager, RuleDefinition
         from managers.risk_scorer import RiskScorer
 
-        # Test 3A: Rule Configuration with Versioning
         print("[1] Testing Rule Configuration Manager...")
         rule_manager = get_rule_config_manager(case_id="test_high_001")
 
@@ -243,11 +219,9 @@ def test_explainability_controls():
         print(f"        Total versions: {len(rule_manager.versions)}")
         print(f"        Total rules: {len(rule_manager.current_version.rules)}")
 
-        # Get current weights
         weights = rule_manager.get_current_weights()
         print(f"   [OK] Loaded {len(weights)} rule weights")
 
-        # Show sample rules
         sample_rules = list(weights.items())[:3]
         for code, weight in sample_rules:
             rule = rule_manager.get_rule(code)
@@ -256,7 +230,6 @@ def test_explainability_controls():
         print()
         print("[2] Testing Rule Weight Adjustment...")
 
-        # Adjust a rule weight
         old_weight = weights.get('double_extension', 65)
         new_weight = 75
 
@@ -277,7 +250,6 @@ def test_explainability_controls():
         print()
         print("[3] Testing Custom Rule Creation...")
 
-        # Add custom rule
         success = rule_manager.add_custom_rule(
             code='custom_macros_detected',
             name='Macros Detected in Document',
@@ -299,7 +271,6 @@ def test_explainability_controls():
         print()
         print("[4] Testing 'Why NOT Flagged' Analysis...")
 
-        # Create a file that scores LOW
         low_risk_file = {
             'name': 'report.docx',
             'path': 'C:/Users/Test/Documents/report.docx',
@@ -310,7 +281,6 @@ def test_explainability_controls():
             'mime_type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         }
 
-        # Score it
         scorer = RiskScorer(case_id="test_high_001")
         risk_score = scorer.score_file(low_risk_file)
 
@@ -318,7 +288,6 @@ def test_explainability_controls():
         print(f"        Severity: {risk_score.severity}")
         print(f"        Rules fired: {len(risk_score.reasons)}")
 
-        # Analyze why not flagged
         analysis = rule_manager.analyze_why_not_flagged(low_risk_file, risk_score)
 
         print(f"   [OK] Why NOT flagged analysis:")
@@ -329,7 +298,6 @@ def test_explainability_controls():
         print(f"        Rules fired: {analysis.rules_fired}")
         print(f"        Rules NOT fired: {len(analysis.rules_not_fired)}")
 
-        # Show why rules didn't fire (top 5)
         print(f"   [OK] Top rules that didn't fire:")
         for code, reason, weight in analysis.rules_not_fired[:5]:
             print(f"        [{weight:3d} pts] {code}: {reason}")
@@ -337,7 +305,6 @@ def test_explainability_controls():
         print()
         print("[5] Testing Version Rollback...")
 
-        # Rollback to version 1
         if len(rule_manager.versions) > 1:
             success = rule_manager.rollback_to_version(
                 version_num=1,
@@ -350,7 +317,6 @@ def test_explainability_controls():
         print()
         print("[6] Testing Configuration Export...")
 
-        # Export current config
         export_path = "config/test_rules_export.json"
         os.makedirs("config", exist_ok=True)
 
@@ -370,7 +336,6 @@ def test_explainability_controls():
         return False
 
 
-# Main test runner
 def main():
     """Run all HIGH priority feature tests"""
     print("=" * 70)
@@ -386,12 +351,10 @@ def main():
 
     results = []
 
-    # Run tests
     results.append(("Confidence & Uncertainty", test_confidence_tracking()))
     results.append(("False Positive Protection", test_false_positive_protection()))
     results.append(("Explainability Controls", test_explainability_controls()))
 
-    # Summary
     print()
     print("=" * 70)
     print("TEST SUMMARY")

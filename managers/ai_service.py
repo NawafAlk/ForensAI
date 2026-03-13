@@ -19,7 +19,6 @@ from typing import Dict, Optional, List
 from datetime import datetime
 from pathlib import Path
 
-# Import audit logger (optional dependency)
 try:
     from managers.audit_logger import get_audit_logger, AuditLogger
     AUDIT_AVAILABLE = True
@@ -27,7 +26,6 @@ except ImportError:
     AUDIT_AVAILABLE = False
     AuditLogger = None
 
-# Import confidence tracker (optional dependency)
 try:
     from managers.confidence_tracker import get_confidence_tracker, ConfidenceTracker, FactType
     CONFIDENCE_AVAILABLE = True
@@ -40,23 +38,20 @@ except ImportError:
 class GroqAIService:
     """Groq API integration for fast forensic analysis."""
 
-    # Available Groq models
     AVAILABLE_MODELS = {
         "llama-3.3-70b-versatile": "Llama 3.3 70B (Best quality)",
         "llama-3.1-8b-instant": "Llama 3.1 8B (Fastest)",
         "mixtral-8x7b-32768": "Mixtral 8x7B (Balanced)",
     }
 
-    # Token limits per analysis type (deeper analysis = more tokens)
     TOKEN_LIMITS = {
-        'file_analysis': 600,       # Detailed file analysis
-        'registry_analysis': 500,   # Registry key analysis
-        'risk_analysis': 800,       # Risk explanation (most detailed)
-        'timestamp_analysis': 500,  # Timeline analysis
-        'overwrite_analysis': 600,  # Overwrite narrative
+        'file_analysis': 600,
+        'registry_analysis': 500,
+        'risk_analysis': 800,
+        'timestamp_analysis': 500,
+        'overwrite_analysis': 600,
     }
 
-    # Domain-specific forensic system prompts
     FORENSIC_SYSTEM_PROMPTS = {
         'file_analysis': """You are a senior digital forensics examiner with expertise in:
 - Windows filesystem forensics (NTFS MFT, $UsnJrnl, $I30 indexes)
@@ -143,7 +138,6 @@ When analyzing overwrite events:
 Write in professional, court-ready language suitable for expert testimony."""
     }
 
-    # Chain-of-reasoning framework for deep analysis
     REASONING_FRAMEWORK = """
 Apply this forensic reasoning process:
 
@@ -155,7 +149,6 @@ Apply this forensic reasoning process:
 6. ACTION: What should the investigator do next?
 """
 
-    # Confidence calibration instructions
     CONFIDENCE_INSTRUCTION = """
 For each assertion, indicate confidence level:
 - FACT: Direct from filesystem metadata (100% certain, cite source)
@@ -166,7 +159,6 @@ For each assertion, indicate confidence level:
 
 Never state speculation as fact. Always identify what evidence would resolve uncertainty."""
 
-    # Rule significance mappings for risk explanations
     RULE_SIGNIFICANCE = {
         'executable_in_temp': "Malware commonly stages in TEMP to avoid detection and survive reboots",
         'executable_in_downloads': "Recent download suggests external origin - check browser history",
@@ -208,28 +200,24 @@ Never state speculation as fact. Always identify what evidence would resolve unc
         """
         self.base_url = "https://api.groq.com/openai/v1/chat/completions"
         self.model = model
-        self.timeout = 30  # Groq is fast, 30s is plenty
+        self.timeout = 30
         self.audit_logger = audit_logger
         self.case_id = case_id
         self.confidence_tracker = confidence_tracker
 
-        # Async HTTP client with connection pooling
         self._async_client = None
 
-        # Load API key from config if not provided
         if api_key:
             self.api_key = api_key
         else:
             self.api_key = self._load_api_key()
 
-        # Initialize audit logger if enabled and not provided
         if self.audit_logger is None and AUDIT_AVAILABLE:
             try:
                 self.audit_logger = get_audit_logger(case_id)
             except:
                 self.audit_logger = None
 
-        # Initialize confidence tracker if enabled and not provided
         if self.confidence_tracker is None and CONFIDENCE_AVAILABLE:
             try:
                 self.confidence_tracker = get_confidence_tracker(case_id)
@@ -260,7 +248,6 @@ Never state speculation as fact. Always identify what evidence would resolve unc
             return False
 
         try:
-            # Quick test with minimal request
             response = requests.post(
                 self.base_url,
                 headers={
@@ -274,7 +261,7 @@ Never state speculation as fact. Always identify what evidence would resolve unc
                 },
                 timeout=10
             )
-            return response.status_code in [200, 429]  # 429 = rate limited but valid key
+            return response.status_code in [200, 429]
         except:
             return False
 
@@ -303,7 +290,6 @@ Never state speculation as fact. Always identify what evidence would resolve unc
         Returns:
             Deep forensic explanation string with confidence levels
         """
-        # Build basic metadata context
         context = f"""=== FILE ARTIFACT ANALYSIS ===
 File: {file_data.get('name', 'unknown')}"""
 
@@ -319,7 +305,6 @@ File: {file_data.get('name', 'unknown')}"""
             size = file_data['size']
             context += f"\nSize: {self._format_size(size)} ({size:,} bytes)"
 
-        # Timestamps with forensic context
         context += "\n\n=== TIMESTAMPS ==="
         if file_data.get('created'):
             context += f"\nCreated (birth): {file_data['created']}"
@@ -330,12 +315,10 @@ File: {file_data.get('name', 'unknown')}"""
         if file_data.get('changed'):
             context += f"\nMetadata Changed (ctime): {file_data['changed']}"
 
-        # Build enriched forensic context
         forensic_context = self._build_forensic_context(file_data)
         if forensic_context:
             context += f"\n\n=== FORENSIC INDICATORS ===\n{forensic_context}"
 
-        # Build prompt with reasoning framework
         prompt = f"""Analyze this file artifact using forensic methodology:
 
 {context}
@@ -379,7 +362,6 @@ Be precise and cite evidence sources (e.g., "from MFT timestamps", "based on fil
         Returns:
             Deep forensic explanation string with MITRE ATT&CK references
         """
-        # Parse key path for forensic context
         key_parts = key_path.split('\\') if key_path else []
         hive = key_parts[0] if key_parts else "Unknown"
         key_name = key_parts[-1] if key_parts else "Unknown"
@@ -396,7 +378,6 @@ Key Name: {key_name}"""
         if value_count is not None:
             context += f"\nValues: {value_count}"
 
-        # Identify forensically significant key categories
         path_lower = key_path.lower() if key_path else ""
         key_category = []
 
@@ -424,11 +405,10 @@ Key Name: {key_name}"""
 
         if values:
             context += "\n\n=== VALUES ==="
-            for val in values[:8]:  # Show up to 8 values for better context
+            for val in values[:8]:
                 val_name = val.get('name', '(Default)')
                 val_type = val.get('type', 'Unknown')
                 val_data = val.get('data', '')
-                # Truncate very long data
                 if isinstance(val_data, str) and len(val_data) > 100:
                     val_data = val_data[:100] + "..."
                 context += f"\n  {val_name} ({val_type}): {val_data}"
@@ -492,22 +472,18 @@ Be precise about what can be definitively determined vs. what requires further i
 
         context += "\n\n=== NTFS TIMESTAMPS ==="
 
-        # Parse timestamps for anomaly detection
         ts_values = {}
         for key, value in timestamps.items():
             if value:
                 context += f"\n{key.capitalize()}: {value}"
                 ts_values[key] = value
 
-        # Detect potential anomalies
         anomalies = []
 
-        # Check for created == modified (suspicious for executables)
         if ts_values.get('created') and ts_values.get('modified'):
             if str(ts_values['created']) == str(ts_values['modified']):
                 anomalies.append("Created equals Modified (potential timestomping or single-write operation)")
 
-        # Check for modified before created (impossible - indicates tampering)
         if ts_values.get('created') and ts_values.get('modified'):
             try:
                 if hasattr(ts_values['created'], 'timestamp') and hasattr(ts_values['modified'], 'timestamp'):
@@ -516,7 +492,6 @@ Be precise about what can be definitively determined vs. what requires further i
             except (TypeError, AttributeError):
                 pass
 
-        # Check for future timestamps
         from datetime import datetime
         now = datetime.now()
         for key, value in ts_values.items():
@@ -603,7 +578,6 @@ Recovery Potential: {carved_file.get('recovery_percentage', 0):.1f}%"""
         if carved_file.get('file_type'):
             context += f"\nFile Type: {carved_file['file_type']}"
 
-        # Cluster analysis for intentionality assessment
         clusters_intact = overwrite_data.get('clusters_intact')
         clusters_total = overwrite_data.get('clusters_total')
         if clusters_intact is not None and clusters_total is not None:
@@ -700,18 +674,15 @@ Write in professional language suitable for expert testimony in court."""
             Structured forensic explanation with facts, interpretation,
             alternative hypotheses, and recommendations
         """
-        # Build comprehensive artifact context
         context = f"""=== RISK ASSESSMENT ANALYSIS ===
 Artifact: {artifact.get('name', 'unknown')}
 Path: {artifact.get('path', 'unknown')}
 Size: {self._format_size(artifact.get('size', 0))} ({artifact.get('size', 0):,} bytes)
 Type: {artifact.get('type', 'unknown')}"""
 
-        # Add risk score with severity context
         risk_context = self._build_risk_context(artifact, score, reasons)
         context += f"\n\n{risk_context}"
 
-        # Add timestamps with forensic context
         context += "\n\n=== TIMESTAMPS ==="
         if artifact.get('created'):
             context += f"\nCreated: {artifact.get('created')}"
@@ -722,12 +693,10 @@ Type: {artifact.get('type', 'unknown')}"""
         if artifact.get('changed'):
             context += f"\nMetadata Changed: {artifact.get('changed')}"
 
-        # Add forensic indicators
         forensic_context = self._build_forensic_context(artifact)
         if forensic_context:
             context += f"\n\n=== FORENSIC INDICATORS ===\n{forensic_context}"
 
-        # Add overwrite analysis if available (critical for deleted files)
         if artifact.get('overwrite_analysis'):
             oa = artifact['overwrite_analysis']
             context += f"\n\n=== CLUSTER/OVERWRITE ANALYSIS ==="
@@ -746,7 +715,6 @@ Type: {artifact.get('type', 'unknown')}"""
                     elif isinstance(item, str):
                         context += f"\n  {i}. {os.path.basename(item)}"
 
-        # Add hash information for threat intel context
         if artifact.get('md5'):
             context += f"\n\nMD5: {artifact['md5']}"
         if artifact.get('sha256'):
@@ -826,7 +794,6 @@ This analysis may be used in legal proceedings - maintain forensic rigor."""
         related_artifacts = related_artifacts or {}
         case_context = case_context or {}
 
-        # Build context for AI evaluation
         context = f"""=== CONTEXTUAL RISK EVALUATION ===
 
 Artifact: {artifact.get('name', 'unknown')}
@@ -838,14 +805,12 @@ Initial Rule Score: {rule_score}/100
 Case Type: {case_context.get('type', 'general')}
 """
 
-        # Add triggered rules
         if triggered_rules:
             context += "\n=== TRIGGERED RULES ===\n"
             for rule in triggered_rules:
                 significance = self.RULE_SIGNIFICANCE.get(rule, rule)
                 context += f"  - {rule}: {significance}\n"
 
-        # Add matched behavioral patterns
         if matched_patterns:
             context += "\n=== BEHAVIORAL PATTERNS DETECTED ===\n"
             for pattern in matched_patterns:
@@ -854,7 +819,6 @@ Case Type: {case_context.get('type', 'general')}
                 context += f"    Attack Stage: {pattern.get('attack_stage', 'unknown')}\n"
                 context += f"    MITRE ATT&CK: {pattern.get('mitre_attack', 'N/A')}\n"
 
-        # Add related artifacts
         temporal = related_artifacts.get('temporal', [])
         spatial = related_artifacts.get('spatial', [])
 
@@ -871,7 +835,6 @@ Case Type: {case_context.get('type', 'general')}
                 for rel in spatial[:5]:
                     context += f"  - {rel.get('name', 'unknown')} (risk: {rel.get('risk_score', 0)})\n"
 
-        # Add key investigation timestamps
         key_timestamps = case_context.get('key_timestamps', [])
         if key_timestamps:
             context += "\n=== KEY INVESTIGATION TIMESTAMPS ===\n"
@@ -910,16 +873,13 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
                 analysis_type="risk_analysis"
             )
 
-            # Parse JSON response
             import json
             import re
 
-            # Try to extract JSON from response
             json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
 
-                # Validate and normalize
                 result['adjusted_score'] = max(0, min(100, int(result.get('adjusted_score', rule_score))))
                 result['score_adjustment'] = int(result.get('score_adjustment', 0))
                 result['false_positive_likelihood'] = float(result.get('false_positive_likelihood', 0.5))
@@ -933,7 +893,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
         except Exception as e:
             print(f"Warning: AI contextual evaluation parsing failed: {e}")
 
-        # Return neutral result on failure
         return {
             'adjusted_score': rule_score,
             'score_adjustment': 0,
@@ -972,7 +931,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
         response_text = ""
         error_occurred = False
 
-        # Select domain-specific system prompt and token limit
         system_prompt = self.FORENSIC_SYSTEM_PROMPTS.get(
             analysis_type,
             self.FORENSIC_SYSTEM_PROMPTS['file_analysis']
@@ -1035,7 +993,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
             response_text = f"Error: {str(e)}"
             error_occurred = True
 
-        # === CONFIDENCE TRACKING ===
         parsed_confidence = 0.0
         if self.confidence_tracker and not error_occurred and CONFIDENCE_AVAILABLE:
             try:
@@ -1065,7 +1022,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
             except Exception as e:
                 print(f"Warning: Confidence tracking failed: {e}")
 
-        # === AUDIT LOGGING ===
         if self.audit_logger:
             try:
                 self.audit_logger.log_ai_interaction(
@@ -1089,9 +1045,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
 
         return response_text
 
-    # =========================================================================
-    # Async Support
-    # =========================================================================
 
     @property
     def async_client(self):
@@ -1138,7 +1091,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
         response_text = ""
         error_occurred = False
 
-        # Select domain-specific system prompt and token limit
         system_prompt = self.FORENSIC_SYSTEM_PROMPTS.get(
             analysis_type,
             self.FORENSIC_SYSTEM_PROMPTS['file_analysis']
@@ -1196,7 +1148,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
             response_text = f"Error: {str(e)}"
             error_occurred = True
 
-        # === CONFIDENCE TRACKING ===
         parsed_confidence = 0.0
         if self.confidence_tracker and not error_occurred and CONFIDENCE_AVAILABLE:
             try:
@@ -1226,7 +1177,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
             except Exception as e:
                 print(f"Warning: Confidence tracking failed: {e}")
 
-        # === AUDIT LOGGING ===
         if self.audit_logger:
             try:
                 self.audit_logger.log_ai_interaction(
@@ -1252,7 +1202,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
 
     async def explain_file_artifact_async(self, file_data: Dict) -> str:
         """Async version of explain_file_artifact."""
-        # Build basic metadata context
         context = f"""=== FILE ARTIFACT ANALYSIS ===
 File: {file_data.get('name', 'unknown')}"""
 
@@ -1773,9 +1722,6 @@ Be conservative with adjustments. Maximum adjustment: +/-20 points."""
             'recommendations': []
         }
 
-    # =========================================================================
-    # New Sync Methods
-    # =========================================================================
 
     def explain_why_suspicious(self, artifact: Dict, score: int, reasons: List[str]) -> str:
         """Generate structured suspicious artifact explanation."""
@@ -1837,17 +1783,14 @@ Be concise and actionable. This is for SOC analyst triage."""
         """
         context_parts = []
 
-        # Allocation status (critical for deleted file analysis)
         if 'is_allocated' in file_data:
             status = "Allocated (live file)" if file_data['is_allocated'] else "Unallocated (deleted/carved)"
             context_parts.append(f"Allocation Status: {status}")
 
-        # Timestamp delta analysis (detect timestomping patterns)
         created = file_data.get('created')
         modified = file_data.get('modified')
         if created and modified:
             try:
-                # Handle both datetime objects and strings
                 if hasattr(created, 'timestamp') and hasattr(modified, 'timestamp'):
                     delta_seconds = abs(modified.timestamp() - created.timestamp())
                     if delta_seconds < 5:
@@ -1855,17 +1798,14 @@ Be concise and actionable. This is for SOC analyst triage."""
                     elif delta_seconds < 60:
                         context_parts.append(f"Timestamp Note: Modified {delta_seconds:.0f}s after creation")
             except (TypeError, AttributeError):
-                pass  # Skip if timestamps aren't parseable
+                pass
 
-        # Changed time (ctime) - indicates metadata modification
         if file_data.get('changed'):
             context_parts.append(f"Metadata Changed (ctime): {file_data['changed']}")
 
-        # Inode for timeline correlation
         if file_data.get('inode'):
             context_parts.append(f"Inode/MFT Entry: {file_data['inode']}")
 
-        # Entropy analysis (encryption/packing indicator)
         if 'entropy' in file_data:
             entropy = file_data['entropy']
             if entropy > 7.9:
@@ -1877,7 +1817,6 @@ Be concise and actionable. This is for SOC analyst triage."""
             else:
                 context_parts.append(f"Entropy: {entropy:.2f}/8.0 (low - likely text/structured data)")
 
-        # File attributes (hidden, system, etc.)
         if file_data.get('attributes'):
             attrs = file_data['attributes']
             if isinstance(attrs, dict):
@@ -1893,13 +1832,11 @@ Be concise and actionable. This is for SOC analyst triage."""
                 if notable:
                     context_parts.append(f"Attributes: {', '.join(notable)}")
 
-        # Hash information for lookup context
         if file_data.get('md5'):
             context_parts.append(f"MD5: {file_data['md5']}")
         if file_data.get('sha256'):
             context_parts.append(f"SHA256: {file_data['sha256']}")
 
-        # Location risk assessment
         path = file_data.get('path', '').lower()
         if path:
             location_notes = []
@@ -1932,7 +1869,6 @@ Be concise and actionable. This is for SOC analyst triage."""
         """
         context = f"Risk Score: {score}/100"
 
-        # Severity tier
         if score >= 90:
             context += " (CRITICAL)"
         elif score >= 70:
@@ -1951,10 +1887,8 @@ Be concise and actionable. This is for SOC analyst triage."""
         return context
 
 
-# Backwards compatibility aliases
 LocalAIService = GroqAIService
 
-# Singleton instance
 _ai_service = None
 
 def get_ai_service() -> GroqAIService:

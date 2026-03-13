@@ -27,7 +27,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-# Add managers to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from managers.audit_logger import get_audit_logger
@@ -43,23 +42,20 @@ def test_audit_trail():
     print("TEST 1: PROVENANCE & AUDIT TRAIL")
     print("="*70)
 
-    # Get audit logger for test case
     audit_logger = get_audit_logger(case_id="test_case_001", log_directory="logs/test")
 
-    # Initialize risk scorer with audit logging
     scorer = RiskScorer(audit_logger=audit_logger, case_id="test_case_001")
 
-    # Test file data (suspicious executable in Downloads)
     test_file = {
         'name': 'invoice_2024.pdf.exe',
         'path': 'C:/Users/JohnDoe/Downloads/invoice_2024.pdf.exe',
         'inode': '12345',
-        'size': 8192,  # Unusually small for legitimate exe
+        'size': 8192,
         'created': '2024-01-15 10:30:00 UTC',
-        'modified': '2024-01-15 10:30:00 UTC',  # Same as created (suspicious)
+        'modified': '2024-01-15 10:30:00 UTC',
         'accessed': '2024-01-15 10:30:00 UTC',
         'is_deleted': False,
-        'entropy': 7.8,  # High entropy (encrypted/packed)
+        'entropy': 7.8,
         'mime_type': 'application/x-executable'
     }
 
@@ -67,7 +63,6 @@ def test_audit_trail():
     print(f"   Artifact: {test_file['name']}")
     print(f"   Path: {test_file['path']}")
 
-    # Score the file (automatically logs to audit trail)
     risk_score = scorer.score_file(test_file)
 
     print(f"\n   [OK] Risk Score: {risk_score.score}/100")
@@ -79,11 +74,9 @@ def test_audit_trail():
         weight = scorer.RULE_WEIGHTS.get(reason, 0)
         print(f"      - [{weight:3d} pts] {reason}")
 
-    # Initialize AI service with audit logging
     print("\n[2] Testing AI Interaction Logging...")
     ai_service = LocalAIService(audit_logger=audit_logger, case_id="test_case_001")
 
-    # Check if Groq API is available
     if ai_service.is_available():
         print("   [OK] Groq API is accessible")
         print("   Requesting AI explanation...")
@@ -95,13 +88,11 @@ def test_audit_trail():
         print("   [WARN] Groq API not configured (skipping AI test)")
         print("   Note: Configure API key in Options > API Keys")
 
-    # Test log export
     print("\n[3] Testing Audit Log Export...")
 
     export_path = audit_logger.export_logs(output_format="json")
     print(f"   [OK] Exported audit logs to: {export_path}")
 
-    # Verify integrity
     print("\n[4] Testing Cryptographic Chain Integrity...")
     integrity = audit_logger.verify_integrity()
 
@@ -113,7 +104,6 @@ def test_audit_trail():
     print(f"     - Entries: {integrity['ai_logs']['entries']}")
     print(f"     - Message: {integrity['ai_logs']['message']}")
 
-    # Get artifact history
     print("\n[5] Testing Artifact History Retrieval...")
     history = audit_logger.get_artifact_history(test_file['inode'])
 
@@ -133,14 +123,11 @@ def test_cluster_overwrite():
 
     print("\n[1] Simulating Cluster Index...")
 
-    # Create mock cluster index (normally would use real ImageHandler)
-    # For testing, we'll create a mock that demonstrates the functionality
     print("   Note: In production, this uses actual disk image cluster data")
 
-    # Simulate a carved file analysis
     carved_file_data = {
-        'offset': 1024 * 1024,  # 1MB offset
-        'size': 512 * 1024,  # 512KB file
+        'offset': 1024 * 1024,
+        'size': 512 * 1024,
         'file_type': 'jpg',
         'deleted_time': '2024-01-10 15:30:00 UTC'
     }
@@ -150,7 +137,6 @@ def test_cluster_overwrite():
     print(f"   Offset: {carved_file_data['offset']}")
     print(f"   Deleted: {carved_file_data['deleted_time']}")
 
-    # Calculate clusters
     cluster_size = 4096
     num_clusters = (carved_file_data['size'] + cluster_size - 1) // cluster_size
 
@@ -158,11 +144,9 @@ def test_cluster_overwrite():
     print(f"   - Cluster Size: {cluster_size} bytes")
     print(f"   - Total Clusters: {num_clusters}")
 
-    # Simulate fragmentation
-    # In real implementation, this comes from ClusterIndex.analyze_overwrite()
     simulated_analysis = {
         'total_clusters': num_clusters,
-        'recovered_clusters': int(num_clusters * 0.7),  # 70% recoverable
+        'recovered_clusters': int(num_clusters * 0.7),
         'recovery_percentage': 70.0,
         'fragmentation_score': 35.5,
         'contiguous_runs': 8,
@@ -187,7 +171,6 @@ def test_cluster_overwrite():
         print(f"     Time: {timestamp}")
         print(f"     Overwrote: {cluster_count} clusters ({size_kb:.1f} KB)")
 
-    # Risk badge calculation
     recovery_pct = simulated_analysis['recovery_percentage']
     frag_score = simulated_analysis['fragmentation_score']
 
@@ -215,12 +198,10 @@ def test_media_detection():
     print("\n[1] Simulating Media Detection...")
     print("   Note: In production, this analyzes actual disk image metadata")
 
-    # Simulate media detection results
-    # In real implementation, this comes from MediaDetector.detect_media_characteristics()
     simulated_media_info = {
         'media_type': 'SSD',
         'media_subtype': 'NVMe',
-        'total_size_bytes': 512 * 1024 * 1024 * 1024,  # 512 GB
+        'total_size_bytes': 512 * 1024 * 1024 * 1024,
         'sector_size': 512,
         'trim_enabled': True,
         'trim_evidence_found': True,
@@ -284,16 +265,12 @@ def main():
     print("  3. SSD/TRIM Detection (media characteristics)")
 
     try:
-        # Test 1: Audit Trail
         test_audit_trail()
 
-        # Test 2: Cluster/Overwrite
         test_cluster_overwrite()
 
-        # Test 3: Media Detection
         test_media_detection()
 
-        # Summary
         print("\n" + "="*70)
         print("ALL TESTS COMPLETE [SUCCESS]")
         print("="*70)

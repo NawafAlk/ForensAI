@@ -16,7 +16,6 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
-# Import audit logger (optional dependency)
 try:
     from managers.audit_logger import get_audit_logger, AuditLogger
     AUDIT_AVAILABLE = True
@@ -24,7 +23,6 @@ except ImportError:
     AUDIT_AVAILABLE = False
     AuditLogger = None
 
-# Import confidence tracker (optional dependency)
 try:
     from managers.confidence_tracker import get_confidence_tracker, ConfidenceTracker, FactType
     CONFIDENCE_AVAILABLE = True
@@ -33,7 +31,6 @@ except ImportError:
     ConfidenceTracker = None
     FactType = None
 
-# Import block map (optional dependency)
 try:
     from managers.block_map import get_cluster_index, OverwriteAnalysis
     BLOCKMAP_AVAILABLE = True
@@ -46,12 +43,12 @@ except ImportError:
 class RiskScore:
     """Risk assessment result for an artifact."""
 
-    score: int  # 0-100
-    severity: str  # 'critical', 'high', 'medium', 'low', 'info'
-    reasons: List[str]  # Rule codes that triggered
-    details: Dict[str, str]  # Human-readable explanations
-    recommendations: List[str]  # What to investigate
-    overwrite_analysis: Optional['OverwriteAnalysis'] = None  # Overwrite analysis if available
+    score: int
+    severity: str
+    reasons: List[str]
+    details: Dict[str, str]
+    recommendations: List[str]
+    overwrite_analysis: Optional['OverwriteAnalysis'] = None
 
 
 class RiskScorer:
@@ -61,7 +58,6 @@ class RiskScorer:
     Evaluates artifacts against forensic indicators and assigns risk scores.
     """
 
-    # Risk thresholds
     SEVERITY_THRESHOLDS = {
         'critical': 90,
         'high': 70,
@@ -70,9 +66,7 @@ class RiskScorer:
         'info': 0
     }
 
-    # Rule weights (how many points each rule adds)
     RULE_WEIGHTS = {
-        # Execution-related
         'executable_in_user_dir': 85,
         'executable_in_temp': 90,
         'executable_in_downloads': 80,
@@ -81,60 +75,50 @@ class RiskScorer:
         'hidden_executable': 70,
         'unsigned_executable': 50,
 
-        # File naming
         'double_extension': 65,
         'suspicious_extension': 60,
         'masquerading_filename': 85,
         'very_long_filename': 40,
         'unicode_obfuscation': 55,
 
-        # Content-based
         'high_entropy': 70,
         'extremely_high_entropy': 85,
         'encrypted_archive': 60,
         'script_in_document': 80,
 
-        # Timestamp anomalies
         'recently_deleted': 65,
         'deleted_during_investigation': 90,
         'timestomp_detected': 95,
         'impossible_timestamp': 70,
         'created_equals_modified': 45,
 
-        # Size anomalies
         'unusually_small_executable': 55,
         'unusually_large_document': 50,
         'zero_byte_file': 30,
 
-        # Location-based
         'file_in_recycle_bin': 60,
         'file_in_system32': 40,
         'file_in_startup': 75,
 
-        # Data exfiltration indicators
         'large_archive_recent': 65,
         'archive_in_temp': 55,
 
-        # Anti-forensics
         'wiping_tool_artifact': 95,
         'encryption_tool_artifact': 75,
         'timestomp_tool': 90
     }
 
-    # Known system executables (shouldn't be elsewhere)
     SYSTEM_EXECUTABLES = {
         'cmd.exe', 'powershell.exe', 'rundll32.exe', 'regsvr32.exe',
         'mshta.exe', 'wscript.exe', 'cscript.exe', 'certutil.exe',
         'bitsadmin.exe', 'schtasks.exe', 'net.exe', 'netsh.exe'
     }
 
-    # Suspicious extensions
     SUSPICIOUS_EXTENSIONS = {
         'exe', 'scr', 'pif', 'bat', 'cmd', 'vbs', 'js', 'jse',
         'wsf', 'wsh', 'ps1', 'psm1', 'msi', 'msp', 'com', 'jar'
     }
 
-    # Document extensions
     DOCUMENT_EXTENSIONS = {
         'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf', 'txt', 'rtf'
     }
@@ -156,7 +140,6 @@ class RiskScorer:
         self.case_id = case_id
         self.confidence_tracker = confidence_tracker
 
-        # Pre-compiled regex patterns for performance
         self._compiled_patterns = {
             'double_ext_doc': re.compile(r'\.(doc|docx|xls|xlsx|ppt|pptx|pdf|txt|rtf)\.(exe|scr|pif|bat|cmd|vbs|js|jse|wsf|wsh|ps1|psm1|msi|msp|com|jar)$', re.IGNORECASE),
             'suspicious_ext': re.compile(r'\.(vbs|js|jse|wsf|wsh|pif|scr)$', re.IGNORECASE),
@@ -173,17 +156,14 @@ class RiskScorer:
             'unicode_suspicious': re.compile(r'[\u200b-\u200f\u202a-\u202e\u2066-\u2069]'),
         }
 
-        # Thread pool for batch scoring
         self._executor = ThreadPoolExecutor(max_workers=4)
 
-        # Initialize audit logger if enabled and not provided
         if self.audit_logger is None and AUDIT_AVAILABLE:
             try:
                 self.audit_logger = get_audit_logger(case_id)
             except:
                 self.audit_logger = None
 
-        # Initialize confidence tracker if enabled and not provided
         if self.confidence_tracker is None and CONFIDENCE_AVAILABLE:
             try:
                 self.confidence_tracker = get_confidence_tracker(case_id)
@@ -213,22 +193,19 @@ class RiskScorer:
         details = {}
         recommendations = []
         total_score = 0
-        rules_fired_log = []  # For audit logging
+        rules_fired_log = []
 
         filename = file_data.get('name', '').lower()
         filepath = file_data.get('path', '').lower()
         size = file_data.get('size', 0)
 
-        # === CONFIDENCE TRACKING: Track derived facts from evidence ===
         if self.confidence_tracker and CONFIDENCE_AVAILABLE:
             self._track_derived_facts(file_data)
 
-        # Execution-related checks
         exec_score, exec_reasons = self._check_executable_risks(file_data)
         total_score += exec_score
         reasons.extend(exec_reasons)
 
-        # Early termination if already critical
         if total_score >= 90:
             reasons_copy = list(reasons)
             for reason in reasons_copy:
@@ -251,43 +228,35 @@ class RiskScorer:
                     pass
             return RiskScore(score=final_score, severity=severity, reasons=reasons, details=details, recommendations=recommendations)
 
-        # Filename checks
         name_score, name_reasons = self._check_filename_risks(file_data)
         total_score += name_score
         reasons.extend(name_reasons)
 
-        # Content-based checks
         content_score, content_reasons = self._check_content_risks(file_data)
         total_score += content_score
         reasons.extend(content_reasons)
 
-        # Timestamp checks
         time_score, time_reasons = self._check_timestamp_risks(file_data)
         total_score += time_score
         reasons.extend(time_reasons)
 
-        # Size checks
         size_score, size_reasons = self._check_size_risks(file_data)
         total_score += size_score
         reasons.extend(size_reasons)
 
-        # Location checks
         loc_score, loc_reasons = self._check_location_risks(file_data)
         total_score += loc_score
         reasons.extend(loc_reasons)
 
-        # Overwrite analysis (if file is deleted/carved)
         overwrite_analysis = None
         if file_data.get('is_deleted', False) or file_data.get('is_carved', False):
             overwrite_score, overwrite_reasons, overwrite_analysis = self._check_overwrite_risks(file_data)
             total_score += overwrite_score
             reasons.extend(overwrite_reasons)
 
-        # Build details and recommendations
         for reason in reasons:
             details[reason] = self._get_reason_description(reason)
 
-            # Build audit log entry for this rule
             rules_fired_log.append({
                 'code': reason,
                 'weight': self.RULE_WEIGHTS.get(reason, 0),
@@ -297,11 +266,9 @@ class RiskScorer:
         if reasons:
             recommendations = self._get_recommendations(reasons, file_data)
 
-        # Cap score at 100
         final_score = min(total_score, 100)
         severity = self._calculate_severity(final_score)
 
-        # === AUDIT LOGGING ===
         if self.audit_logger and rules_fired_log:
             try:
                 artifact_id = file_data.get('inode', file_data.get('hash', filename))
@@ -314,10 +281,9 @@ class RiskScorer:
                     final_score=final_score,
                     severity=severity,
                     rules_fired=rules_fired_log,
-                    artifact_data=file_data  # For input hash
+                    artifact_data=file_data
                 )
             except Exception as e:
-                # Don't fail scoring if audit logging fails
                 print(f"Warning: Audit logging failed: {e}")
 
         return RiskScore(
@@ -363,7 +329,6 @@ class RiskScorer:
         artifact_name = file_data.get('name', '')
 
         try:
-            # Track filename (100% confidence - directly from evidence)
             if artifact_name:
                 self.confidence_tracker.add_fact(
                     fact_type=FactType.DERIVED,
@@ -376,7 +341,6 @@ class RiskScorer:
                     reasoning="Directly extracted from filesystem"
                 )
 
-            # Track file size (100% confidence)
             if 'size' in file_data:
                 self.confidence_tracker.add_fact(
                     fact_type=FactType.DERIVED,
@@ -389,7 +353,6 @@ class RiskScorer:
                     reasoning="Directly extracted from filesystem"
                 )
 
-            # Track timestamps (100% confidence for filesystem timestamps)
             for ts_type in ['created', 'modified', 'accessed', 'changed']:
                 if ts_type in file_data and file_data[ts_type]:
                     self.confidence_tracker.add_fact(
@@ -403,7 +366,6 @@ class RiskScorer:
                         reasoning="Directly extracted from filesystem"
                     )
 
-            # Track file path (100% confidence)
             if 'path' in file_data:
                 self.confidence_tracker.add_fact(
                     fact_type=FactType.DERIVED,
@@ -416,7 +378,6 @@ class RiskScorer:
                     reasoning="Directly extracted from filesystem"
                 )
 
-            # Track entropy (95% confidence - computed but deterministic)
             if 'entropy' in file_data:
                 self.confidence_tracker.add_fact(
                     fact_type=FactType.COMPUTED,
@@ -429,7 +390,6 @@ class RiskScorer:
                     reasoning="Mathematically computed from file contents"
                 )
 
-            # Track hash values (100% confidence - cryptographic)
             for hash_type in ['md5', 'sha1', 'sha256']:
                 if hash_type in file_data and file_data[hash_type]:
                     self.confidence_tracker.add_fact(
@@ -443,7 +403,6 @@ class RiskScorer:
                         reasoning="Cryptographically computed from file contents"
                     )
 
-            # Track MIME type (90% confidence - heuristic based)
             if 'mime_type' in file_data:
                 self.confidence_tracker.add_fact(
                     fact_type=FactType.COMPUTED,
@@ -456,8 +415,6 @@ class RiskScorer:
                     reasoning="Detected from file signature and content analysis"
                 )
 
-            # Add uncertainty indicators for certain conditions
-            # Missing critical metadata
             if 'created' not in file_data or 'modified' not in file_data:
                 self.confidence_tracker.add_uncertainty(
                     indicator_type="missing_data",
@@ -467,7 +424,6 @@ class RiskScorer:
                     affected_artifacts=[artifact_id]
                 )
 
-            # Deleted file (lower confidence in full recovery)
             if file_data.get('is_deleted', False):
                 self.confidence_tracker.add_uncertainty(
                     indicator_type="incomplete_recovery",
@@ -490,7 +446,6 @@ class RiskScorer:
         ext = os.path.splitext(filename)[1][1:] if '.' in filename else ''
 
         if ext in ['exe', 'dll', 'sys', 'scr', 'com']:
-            # Executable file - check location
             if 'users' in filepath and 'downloads' in filepath:
                 score += self.RULE_WEIGHTS['executable_in_downloads']
                 reasons.append('executable_in_downloads')
@@ -507,7 +462,6 @@ class RiskScorer:
                 score += self.RULE_WEIGHTS['executable_in_user_dir']
                 reasons.append('executable_in_user_dir')
 
-            # Check if system executable in wrong place
             base_filename = os.path.basename(filename)
             if base_filename in self.SYSTEM_EXECUTABLES:
                 if 'windows\\system32' not in filepath and 'windows\\syswow64' not in filepath:
@@ -524,12 +478,10 @@ class RiskScorer:
         filename = file_data.get('name', '')
         filename_lower = filename.lower()
 
-        # Double extension (e.g., document.pdf.exe) - uses pre-compiled regex
         if hasattr(self, '_compiled_patterns') and self._compiled_patterns['double_ext_doc'].search(filename_lower):
             score += self.RULE_WEIGHTS['double_extension']
             reasons.append('double_extension')
         else:
-            # Fallback for non-optimized path
             parts = filename.split('.')
             if len(parts) >= 3:
                 second_last_ext = parts[-2].lower()
@@ -538,19 +490,16 @@ class RiskScorer:
                     score += self.RULE_WEIGHTS['double_extension']
                     reasons.append('double_extension')
 
-        # Masquerading as system file
         if os.path.basename(filename_lower) in self.SYSTEM_EXECUTABLES:
             filepath = file_data.get('path', '').lower()
             if 'system32' not in filepath:
                 score += self.RULE_WEIGHTS['masquerading_filename']
                 reasons.append('masquerading_filename')
 
-        # Very long filename (possible obfuscation)
         if len(filename) > 200:
             score += self.RULE_WEIGHTS['very_long_filename']
             reasons.append('very_long_filename')
 
-        # Suspicious extension
         ext = os.path.splitext(filename)[1][1:].lower() if '.' in filename else ''
         if ext in ['vbs', 'js', 'jse', 'wsf', 'wsh', 'pif', 'scr']:
             score += self.RULE_WEIGHTS['suspicious_extension']
@@ -565,7 +514,6 @@ class RiskScorer:
 
         entropy = file_data.get('entropy')
         if entropy is not None:
-            # High entropy suggests encryption/compression
             if entropy > 7.8:
                 score += self.RULE_WEIGHTS['extremely_high_entropy']
                 reasons.append('extremely_high_entropy')
@@ -573,7 +521,6 @@ class RiskScorer:
                 score += self.RULE_WEIGHTS['high_entropy']
                 reasons.append('high_entropy')
 
-        # Encrypted archives
         filename = file_data.get('name', '').lower()
         if any(ext in filename for ext in ['.7z', '.rar', '.zip', '.aes']):
             if entropy and entropy > 7.5:
@@ -587,34 +534,28 @@ class RiskScorer:
         score = 0
         reasons = []
 
-        # Parse timestamps
         created = self._parse_timestamp(file_data.get('created'))
         modified = self._parse_timestamp(file_data.get('modified'))
         accessed = self._parse_timestamp(file_data.get('accessed'))
 
-        # Recently deleted
         if file_data.get('is_deleted'):
             if file_data.get('deleted_time'):
                 deleted = self._parse_timestamp(file_data['deleted_time'])
                 if deleted:
-                    # Deleted in last 7 days
                     days_ago = (datetime.now() - deleted).days
                     if days_ago <= 7:
                         score += self.RULE_WEIGHTS['recently_deleted']
                         reasons.append('recently_deleted')
 
-                    # Deleted during investigation period
                     if deleted >= self.investigation_start_time:
                         score += self.RULE_WEIGHTS['deleted_during_investigation']
                         reasons.append('deleted_during_investigation')
 
-        # Timestomp detection (created after modified)
         if created and modified:
             if created > modified:
                 score += self.RULE_WEIGHTS['timestomp_detected']
                 reasons.append('timestomp_detected')
 
-        # Impossible timestamps (future or too old)
         now = datetime.now()
         for ts in [created, modified, accessed]:
             if ts:
@@ -622,15 +563,12 @@ class RiskScorer:
                     score += self.RULE_WEIGHTS['impossible_timestamp']
                     reasons.append('impossible_timestamp')
                     break
-                # Before 1990 (suspicious for modern files)
                 if ts.year < 1990:
                     score += self.RULE_WEIGHTS['impossible_timestamp']
                     reasons.append('impossible_timestamp')
                     break
 
-        # Created == Modified (common for timestomping)
         if created and modified and created == modified:
-            # Only suspicious for executable types
             ext = os.path.splitext(file_data.get('name', ''))[1][1:].lower()
             if ext in self.SUSPICIOUS_EXTENSIONS:
                 score += self.RULE_WEIGHTS['created_equals_modified']
@@ -647,23 +585,19 @@ class RiskScorer:
         filename = file_data.get('name', '').lower()
         ext = os.path.splitext(filename)[1][1:] if '.' in filename else ''
 
-        # Unusually small executable
-        if ext in ['exe', 'dll'] and 0 < size < 10000:  # < 10KB
+        if ext in ['exe', 'dll'] and 0 < size < 10000:
             score += self.RULE_WEIGHTS['unusually_small_executable']
             reasons.append('unusually_small_executable')
 
-        # Unusually large document
-        if ext in self.DOCUMENT_EXTENSIONS and size > 100 * 1024 * 1024:  # > 100MB
+        if ext in self.DOCUMENT_EXTENSIONS and size > 100 * 1024 * 1024:
             score += self.RULE_WEIGHTS['unusually_large_document']
             reasons.append('unusually_large_document')
 
-        # Zero-byte file (can indicate deletion artifact)
         if size == 0:
             score += self.RULE_WEIGHTS['zero_byte_file']
             reasons.append('zero_byte_file')
 
-        # Large recent archive (possible data exfiltration)
-        if ext in ['zip', '7z', 'rar', 'tar', 'gz'] and size > 50 * 1024 * 1024:  # > 50MB
+        if ext in ['zip', '7z', 'rar', 'tar', 'gz'] and size > 50 * 1024 * 1024:
             modified = self._parse_timestamp(file_data.get('modified'))
             if modified and (datetime.now() - modified).days <= 7:
                 score += self.RULE_WEIGHTS['large_archive_recent']
@@ -678,17 +612,14 @@ class RiskScorer:
 
         filepath = file_data.get('path', '').lower()
 
-        # Recycle bin
         if '$recycle.bin' in filepath or 'recycler' in filepath:
             score += self.RULE_WEIGHTS['file_in_recycle_bin']
             reasons.append('file_in_recycle_bin')
 
-        # Startup folders
         if 'startup' in filepath or 'run' in filepath:
             score += self.RULE_WEIGHTS['file_in_startup']
             reasons.append('file_in_startup')
 
-        # Temp directories with archives
         if ('temp' in filepath or 'tmp' in filepath):
             ext = os.path.splitext(file_data.get('name', ''))[1][1:].lower()
             if ext in ['zip', '7z', 'rar']:
@@ -712,14 +643,12 @@ class RiskScorer:
             return score, reasons, overwrite_analysis
 
         try:
-            # Get cluster index (requires image_handler)
             image_handler = file_data.get('image_handler')
             if not image_handler:
                 return score, reasons, overwrite_analysis
 
             cluster_index = get_cluster_index(image_handler)
 
-            # Perform overwrite analysis
             carved_data = {
                 'offset': file_data.get('offset', 0),
                 'size': file_data.get('size', 0),
@@ -730,12 +659,10 @@ class RiskScorer:
             carved_id = str(file_data.get('inode', file_data.get('hash', file_data.get('name', ''))))
             overwrite_analysis = cluster_index.analyze_overwrite(carved_id, carved_data)
 
-            # Add risk score based on overwrite analysis
             if overwrite_analysis:
                 overwrite_contrib = overwrite_analysis.to_risk_contribution()
                 score += overwrite_contrib
 
-                # Add specific reasons based on overwrite patterns
                 if overwrite_analysis.overwrite_risk_pct > 70:
                     reasons.append('heavily_overwritten')
                 elif overwrite_analysis.overwrite_risk_pct > 40:
@@ -750,7 +677,6 @@ class RiskScorer:
                     reasons.append('highly_fragmented_deleted')
 
         except Exception as e:
-            # Don't fail scoring if overwrite analysis fails
             print(f"Warning: Overwrite analysis failed: {e}")
 
         return score, reasons, overwrite_analysis
@@ -795,7 +721,6 @@ class RiskScorer:
             'file_in_startup': 'File found in startup location',
             'large_archive_recent': 'Large archive created recently',
             'archive_in_temp': 'Archive file found in temporary directory',
-            # Overwrite-related
             'heavily_overwritten': 'File heavily overwritten (>70% of clusters reused)',
             'partially_overwritten': 'File partially overwritten (>40% of clusters reused)',
             'minor_overwrite': 'Minor overwrite detected (>10% of clusters affected)',
@@ -859,10 +784,8 @@ class RiskScorer:
     def set_case_context(self, case_type: str = 'general'):
         """Adjust scoring thresholds based on case context."""
         if case_type == 'malware':
-            # Lower thresholds for malware cases - more sensitive
             self.SEVERITY_THRESHOLDS = {'critical': 85, 'high': 65, 'medium': 35, 'low': 15, 'info': 0}
         elif case_type == 'data_theft':
-            # Standard thresholds but boost exfiltration rules
             self.SEVERITY_THRESHOLDS = {'critical': 90, 'high': 70, 'medium': 40, 'low': 20, 'info': 0}
         elif case_type == 'intrusion':
             self.SEVERITY_THRESHOLDS = {'critical': 88, 'high': 68, 'medium': 38, 'low': 18, 'info': 0}
@@ -876,7 +799,6 @@ class RiskScorer:
             return None
 
         try:
-            # Try common formats
             for fmt in ['%Y-%m-%d %H:%M:%S UTC', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
                 try:
                     return datetime.strptime(ts_str, fmt)
@@ -888,7 +810,6 @@ class RiskScorer:
         return None
 
 
-# Singleton instance
 _risk_scorer = None
 
 def get_risk_scorer() -> RiskScorer:
@@ -898,10 +819,6 @@ def get_risk_scorer() -> RiskScorer:
         _risk_scorer = RiskScorer()
     return _risk_scorer
 
-
-# =============================================================================
-# HYBRID INTELLIGENCE RISK SCORING SYSTEM
-# =============================================================================
 
 @dataclass
 class CaseContext:
@@ -921,18 +838,17 @@ class CaseContext:
         'general': 'General forensic examination',
     }
 
-    # Weight multipliers by case type
     CATEGORY_MULTIPLIERS = {
         'malware': {
-            'execution': 1.2,      # Executables more important
+            'execution': 1.2,
             'anti_forensic': 1.0,
             'exfiltration': 0.8,
             'persistence': 1.3,
         },
         'data_theft': {
             'execution': 0.8,
-            'anti_forensic': 1.3,  # Evidence tampering critical
-            'exfiltration': 1.4,   # Data staging/archives critical
+            'anti_forensic': 1.3,
+            'exfiltration': 1.4,
             'persistence': 0.7,
         },
         'intrusion': {
@@ -954,8 +870,8 @@ class CaseContext:
     investigation_start: Optional[datetime] = None
     known_good_hashes: Set[str] = field(default_factory=set)
     known_bad_hashes: Set[str] = field(default_factory=set)
-    key_timestamps: List[Tuple[datetime, str]] = field(default_factory=list)  # (time, description)
-    focus_paths: List[str] = field(default_factory=list)  # Directories of interest
+    key_timestamps: List[Tuple[datetime, str]] = field(default_factory=list)
+    focus_paths: List[str] = field(default_factory=list)
 
     def get_multiplier(self, category: str) -> float:
         """Get weight multiplier for a rule category."""
@@ -994,37 +910,30 @@ class HybridRiskScore:
     correlation analysis, and AI contextual evaluation.
     """
 
-    # Core scores
-    rule_score: int              # Base rule engine score (0-100)
-    pattern_boost: int           # Behavioral pattern boost
-    correlation_boost: int       # Correlation-based adjustment
-    ai_adjustment: int           # AI contextual adjustment
-    final_score: int             # Combined final score (capped at 100)
+    rule_score: int
+    pattern_boost: int
+    correlation_boost: int
+    ai_adjustment: int
+    final_score: int
 
-    # Classification
-    severity: str                # 'critical', 'high', 'medium', 'low', 'info'
-    confidence: float            # 0.0-1.0 confidence in assessment
+    severity: str
+    confidence: float
 
-    # Evidence
     triggered_rules: List[str]
     rule_details: Dict[str, str]
     matched_patterns: List[Dict]
     correlation_insights: Dict
 
-    # AI reasoning (if used)
     ai_used: bool
     ai_reasoning: Optional[str]
     false_positive_likelihood: float
     attack_chain_stage: Optional[str]
 
-    # Recommendations
     recommendations: List[str]
 
-    # Overwrite analysis (if applicable)
     overwrite_analysis: Optional['OverwriteAnalysis'] = None
 
 
-# Behavioral patterns that indicate specific attack types
 BEHAVIORAL_PATTERNS = {
     'malware_dropper': {
         'name': 'Malware Dropper Pattern',
@@ -1122,9 +1031,7 @@ BEHAVIORAL_PATTERNS = {
     }
 }
 
-# Rule to category mapping for adaptive weights
 RULE_CATEGORIES = {
-    # Execution category
     'executable_in_user_dir': 'execution',
     'executable_in_temp': 'execution',
     'executable_in_downloads': 'execution',
@@ -1133,10 +1040,8 @@ RULE_CATEGORIES = {
     'hidden_executable': 'execution',
     'unsigned_executable': 'execution',
 
-    # Persistence category
     'file_in_startup': 'persistence',
 
-    # Anti-forensic category
     'timestomp_detected': 'anti_forensic',
     'deleted_during_investigation': 'anti_forensic',
     'recently_deleted': 'anti_forensic',
@@ -1146,12 +1051,10 @@ RULE_CATEGORIES = {
     'wiping_tool_artifact': 'anti_forensic',
     'impossible_timestamp': 'anti_forensic',
 
-    # Exfiltration category
     'large_archive_recent': 'exfiltration',
     'encrypted_archive': 'exfiltration',
     'archive_in_temp': 'exfiltration',
 
-    # Other (default multiplier)
     'double_extension': 'other',
     'suspicious_extension': 'other',
     'masquerading_filename': 'other',
@@ -1172,8 +1075,7 @@ class HybridRiskScorer:
     intelligence layers for more accurate threat assessment.
     """
 
-    # Threshold for triggering AI evaluation
-    AI_EVALUATION_THRESHOLD = 50  # Medium+ risk
+    AI_EVALUATION_THRESHOLD = 50
 
     def __init__(self, case_context: CaseContext = None,
                  use_ai: bool = True, audit_logger: Optional[AuditLogger] = None,
@@ -1192,21 +1094,18 @@ class HybridRiskScorer:
         self.audit_logger = audit_logger
         self.case_id = case_id
 
-        # Initialize base rule scorer
         self.rule_scorer = RiskScorer(
             investigation_start_time=self.case_context.investigation_start,
             audit_logger=audit_logger,
             case_id=case_id
         )
 
-        # Initialize correlation engine
         try:
             from managers.correlation_engine import get_correlation_engine
             self.correlation_engine = get_correlation_engine()
         except ImportError:
             self.correlation_engine = None
 
-        # Initialize AI service (lazy load)
         self._ai_service = None
 
     @property
@@ -1236,7 +1135,6 @@ class HybridRiskScorer:
         7. Return hybrid score with full reasoning
         """
 
-        # === Pre-check: Known good/bad ===
         file_hash = artifact.get('md5') or artifact.get('sha256')
         if file_hash:
             if self.case_context.is_known_good(file_hash):
@@ -1244,36 +1142,29 @@ class HybridRiskScorer:
             if self.case_context.is_known_bad(file_hash):
                 return self._create_known_bad_result(artifact)
 
-        # === Layer 1: Rule engine ===
         rule_result = self.rule_scorer.score_file(artifact)
 
-        # === Layer 1b: Apply case-type weight adjustments ===
         adjusted_rule_score = self._apply_case_multipliers(
             rule_result.score, rule_result.reasons
         )
 
-        # === Layer 2: Behavioral patterns ===
         matched_patterns = self._detect_behavioral_patterns(rule_result.reasons)
         pattern_boost = sum(p['score_boost'] for p in matched_patterns)
 
-        # === Layer 3: Correlation ===
         correlation_boost = 0
         correlation_insights = {}
 
         if self.correlation_engine:
             artifact_id = self._get_artifact_id(artifact)
 
-            # Add to correlation tracking
             self.correlation_engine.add_artifact(
                 artifact_id, artifact,
                 risk_score=adjusted_rule_score + pattern_boost,
                 rules=rule_result.reasons
             )
 
-            # Get correlation insights
             correlation_insights = self.correlation_engine.get_correlation_summary(artifact_id)
 
-            # Boost score based on correlation findings
             if correlation_insights.get('total_related', 0) >= 3:
                 correlation_boost += 10
             if correlation_insights.get('attack_chain_stage'):
@@ -1281,13 +1172,11 @@ class HybridRiskScorer:
             if any(c.get('confidence') == 'high' for c in correlation_insights.get('clusters', [])):
                 correlation_boost += 10
 
-        # === Calculate intermediate score ===
         intermediate_score = min(
             adjusted_rule_score + pattern_boost + correlation_boost,
             100
         )
 
-        # === Layer 4: AI evaluation (for complex cases) ===
         ai_assessment = None
         ai_adjustment = 0
         ai_used = False
@@ -1301,28 +1190,23 @@ class HybridRiskScorer:
                 ai_used = True
                 ai_adjustment = ai_assessment.get('score_adjustment', 0)
 
-        # === Compute final score ===
         final_score = min(intermediate_score + ai_adjustment, 100)
-        final_score = max(final_score, 0)  # Floor at 0
+        final_score = max(final_score, 0)
 
-        # Determine severity and confidence
         severity = self._calculate_severity(final_score)
         confidence = self._calculate_confidence(
             rule_result, matched_patterns, correlation_insights, ai_assessment
         )
 
-        # Build recommendations
         recommendations = self._build_recommendations(
             rule_result.reasons, matched_patterns,
             correlation_insights, ai_assessment
         )
 
-        # Determine attack chain stage
         attack_stage = None
         if correlation_insights.get('attack_chain_stage'):
             attack_stage = correlation_insights['attack_chain_stage'].get('stage')
         elif matched_patterns:
-            # Use highest confidence pattern's stage
             attack_stage = matched_patterns[0].get('attack_stage')
 
         return HybridRiskScore(
@@ -1350,7 +1234,6 @@ class HybridRiskScorer:
         if not rules:
             return base_score
 
-        # Calculate weighted adjustment
         total_adjustment = 0
         for rule in rules:
             category = RULE_CATEGORIES.get(rule, 'other')
@@ -1368,7 +1251,6 @@ class HybridRiskScorer:
         matched = []
 
         for pattern_id, pattern in BEHAVIORAL_PATTERNS.items():
-            # Check required rules
             required_match = all(
                 rule in triggered_rules
                 for rule in pattern['required']
@@ -1377,7 +1259,6 @@ class HybridRiskScorer:
             if not required_match:
                 continue
 
-            # Count supporting rules
             supporting_count = sum(
                 1 for rule in pattern['supporting']
                 if rule in triggered_rules
@@ -1399,7 +1280,6 @@ class HybridRiskScorer:
                     ]
                 })
 
-        # Sort by confidence (critical > high > medium > low)
         confidence_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
         matched.sort(key=lambda x: confidence_order.get(x['confidence'], 4))
 
@@ -1410,11 +1290,9 @@ class HybridRiskScorer:
         if not self.use_ai or not self.ai_service:
             return False
 
-        # Always evaluate if patterns detected
         if patterns:
             return True
 
-        # Evaluate medium+ risk artifacts
         if score >= self.AI_EVALUATION_THRESHOLD:
             return True
 
@@ -1428,7 +1306,6 @@ class HybridRiskScorer:
             return None
 
         try:
-            # Get related artifacts for context
             related = correlation.get('related_artifacts', {})
 
             result = self.ai_service.evaluate_risk_contextually(
@@ -1468,15 +1345,13 @@ class HybridRiskScorer:
                                correlation: Dict,
                                ai_assessment: Optional[Dict]) -> float:
         """Calculate overall confidence in the assessment."""
-        confidence = 0.5  # Base confidence
+        confidence = 0.5
 
-        # More triggered rules = higher confidence
         if len(rule_result.reasons) >= 3:
             confidence += 0.15
         elif len(rule_result.reasons) >= 2:
             confidence += 0.1
 
-        # Patterns increase confidence
         if patterns:
             pattern_conf = max(
                 0.1 if p['confidence'] == 'low' else
@@ -1487,13 +1362,11 @@ class HybridRiskScorer:
             )
             confidence += pattern_conf
 
-        # Correlation increases confidence
         if correlation.get('total_related', 0) >= 3:
             confidence += 0.1
         if correlation.get('attack_chain_stage'):
             confidence += 0.1
 
-        # AI assessment adjusts confidence
         if ai_assessment:
             ai_conf = ai_assessment.get('confidence', 'medium')
             if ai_conf == 'high':
@@ -1509,18 +1382,15 @@ class HybridRiskScorer:
         """Build investigation recommendations."""
         recommendations = []
 
-        # Add AI recommendations first (if available)
         if ai_assessment and ai_assessment.get('recommendations'):
             recommendations.extend(ai_assessment['recommendations'][:3])
 
-        # Add pattern-based recommendations
         for pattern in patterns:
             if pattern['mitre_attack']:
                 recommendations.append(
                     f"Research MITRE ATT&CK {pattern['mitre_attack']} for IOC hunting"
                 )
 
-        # Add correlation-based recommendations
         if correlation.get('total_related', 0) >= 2:
             recommendations.append(
                 f"Timeline {correlation['total_related']} related artifacts together"
@@ -1532,13 +1402,11 @@ class HybridRiskScorer:
                 f"Investigate artifacts in {stage} stage of attack chain"
             )
 
-        # Add rule-based recommendations (from base scorer)
         rule_recs = self.rule_scorer._get_recommendations(rules, {})
         for rec in rule_recs:
             if rec not in recommendations:
                 recommendations.append(rec)
 
-        # Deduplicate and limit
         seen = set()
         unique_recs = []
         for rec in recommendations:
@@ -1546,7 +1414,7 @@ class HybridRiskScorer:
                 seen.add(rec)
                 unique_recs.append(rec)
 
-        return unique_recs[:8]  # Limit to top 8
+        return unique_recs[:8]
 
     def _get_artifact_id(self, artifact: Dict) -> str:
         """Extract artifact ID from artifact dict."""
@@ -1599,7 +1467,6 @@ class HybridRiskScorer:
         )
 
 
-# Singleton instance for hybrid scorer
 _hybrid_risk_scorer = None
 
 

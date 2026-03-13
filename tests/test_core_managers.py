@@ -17,13 +17,8 @@ import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-
-# ============================================================
-# Risk Scorer Tests
-# ============================================================
 
 class TestRiskScore:
     """Tests for the RiskScore dataclass."""
@@ -98,7 +93,6 @@ class TestRiskScorer:
             'modified': '2025-01-15 08:00:00',
         }
         result = self.scorer.score_file(artifact)
-        # Should be flagged as executable in user dir at minimum
         assert result.score >= 70, f"System file in wrong location scored too low: {result.score}"
         assert 'executable_in_user_dir' in result.reasons
 
@@ -109,7 +103,7 @@ class TestRiskScorer:
             'path': 'C:\\Users\\John\\AppData\\Local\\Temp\\cmd.exe',
             'size': 289792,
             'created': '2025-01-20 14:30:00',
-            'modified': '2020-01-01 00:00:00',  # Timestamp anomaly
+            'modified': '2020-01-01 00:00:00',
             'is_hidden': True,
             'is_deleted': True,
         }
@@ -158,10 +152,6 @@ class TestRiskScorer:
         assert len(result.recommendations) > 0
 
 
-# ============================================================
-# Audit Logger Tests
-# ============================================================
-
 class TestAuditLogger:
     """Tests for the AuditLogger hash chain and serialization."""
 
@@ -190,7 +180,6 @@ class TestAuditLogger:
                 {'code': 'executable_in_temp', 'weight': 90, 'description': 'Executable in temp'}
             ]
         )
-        # Verify log file was created
         log_files = list(Path(self.temp_dir).glob("*rules*.jsonl"))
         assert len(log_files) >= 1
 
@@ -199,7 +188,6 @@ class TestAuditLogger:
         from managers.audit_logger import AuditLogger
         logger = AuditLogger(case_id="test_003", log_directory=self.temp_dir)
 
-        # Log multiple entries
         for i in range(5):
             logger.log_rule_firing(
                 artifact_id=f"inode_{i}",
@@ -210,7 +198,6 @@ class TestAuditLogger:
                 rules_fired=[{'code': 'test_rule', 'weight': 50, 'description': 'Test'}]
             )
 
-        # Verify chain integrity
         result = logger.verify_integrity()
         assert isinstance(result, dict)
         assert result.get('rules_valid', True), "Hash chain integrity check failed"
@@ -247,10 +234,6 @@ class TestAuditLogger:
         result = logger.export_logs(output_format='json', output_path=export_path)
         assert result is not None
 
-
-# ============================================================
-# Confidence Tracker Tests
-# ============================================================
 
 class TestConfidenceScore:
     """Tests for the ConfidenceScore dataclass."""
@@ -310,10 +293,6 @@ class TestFactType:
         assert FactType.EXTERNAL.value == "external"
 
 
-# ============================================================
-# Block Map / Overwrite Analysis Tests
-# ============================================================
-
 class TestOverwriteAnalysis:
     """Tests for block map overwrite analysis."""
 
@@ -333,7 +312,7 @@ class TestOverwriteAnalysis:
         )
         assert analysis.recovery_percentage == 75.0
         assert analysis.total_clusters == 100
-        assert analysis.clusters_total == 100  # Property alias
+        assert analysis.clusters_total == 100
 
     def test_overwrite_analysis_fields(self):
         from managers.block_map import OverwriteAnalysis
@@ -353,10 +332,6 @@ class TestOverwriteAnalysis:
         assert len(analysis.overwritten_by) == 0
 
 
-# ============================================================
-# Carving Confidence Tests
-# ============================================================
-
 class TestCarvingConfidence:
     """Tests for file carving confidence scoring."""
 
@@ -374,10 +349,6 @@ class TestCarvingConfidence:
         cc = CarvingConfidence()
         assert hasattr(cc, 'evaluate')
 
-
-# ============================================================
-# Hybrid Risk Scorer Tests
-# ============================================================
 
 class TestHybridRiskScorer:
     """Tests for the HybridRiskScorer behavioral pattern detection."""
@@ -399,21 +370,20 @@ class TestHybridRiskScorer:
     def test_case_context_multipliers(self):
         from managers.risk_scorer import CaseContext
         ctx = CaseContext(case_type='insider_threat')
-        # Default multiplier should be 1.0
         assert ctx.get_multiplier('unknown_category') == 1.0
 
     def test_known_good_hash(self):
         from managers.risk_scorer import CaseContext
         ctx = CaseContext()
         ctx.known_good_hashes.add('abc123')
-        assert ctx.is_known_good('ABC123')  # Case insensitive
+        assert ctx.is_known_good('ABC123')
         assert not ctx.is_known_good('def456')
 
     def test_known_bad_hash(self):
         from managers.risk_scorer import CaseContext
         ctx = CaseContext()
         ctx.known_bad_hashes.add('malware123')
-        assert ctx.is_known_bad('MALWARE123')  # Case insensitive
+        assert ctx.is_known_bad('MALWARE123')
         assert not ctx.is_known_bad('clean456')
 
     def test_null_hash_handling(self):

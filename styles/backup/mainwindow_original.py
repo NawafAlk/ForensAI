@@ -38,7 +38,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # Initialize instance attributes
         self.image_mounted = False
         self.current_offset = None
         self.current_image_path = None
@@ -46,7 +45,7 @@ class MainWindow(QMainWindow):
         self.image_manager = ImageManager()
         self.db_manager = DatabaseManager('tools/new_database_mappings.db')
         self.current_selected_data = None
-        self.current_file_content = None  # Store file content for carved files
+        self.current_file_content = None
 
         self.evidence_files = []
 
@@ -58,7 +57,6 @@ class MainWindow(QMainWindow):
                                                                                                                message),
                 setattr(self, "image_mounted", not self.image_mounted) if success else None)[1])
 
-        # # Load existing API keys
         self.api_keys = configparser.ConfigParser()
         self.api_keys.read('config.ini')
 
@@ -81,7 +79,7 @@ class MainWindow(QMainWindow):
             'Remove Evidence File': self.remove_image_evidence,
             'Image Mounting': self.image_manager.mount_image,
             'Image Unmounting': self.image_manager.dismount_image,
-            'separator': None,  # This will add a separator
+            'separator': None,
             'Exit': self.close
         }
 
@@ -89,43 +87,34 @@ class MainWindow(QMainWindow):
 
         view_menu = QMenu('View', self)
 
-        # Create the "Full Screen" action and connect it to the showFullScreen slot
         full_screen_action = QAction("Full Screen", self)
         full_screen_action.triggered.connect(self.showFullScreen)
         view_menu.addAction(full_screen_action)
 
-        # Create the "Normal Screen" action and connect it to the showNormal slot
         normal_screen_action = QAction("Normal Screen", self)
         normal_screen_action.triggered.connect(self.showNormal)
         view_menu.addAction(normal_screen_action)
 
-        # Add a separator
         view_menu.addSeparator()
 
-        # **Add Theme Selection Actions**
-        # Create an action group for themes
         theme_group = QActionGroup(self)
-        theme_group.setExclusive(True)  # Only one theme can be selected at a time
+        theme_group.setExclusive(True)
 
-        # Light Theme Action
         light_theme_action = QAction("Light Mode", self)
         light_theme_action.setCheckable(True)
-        light_theme_action.setChecked(True)  # Set Light Theme as default
+        light_theme_action.setChecked(True)
         light_theme_action.triggered.connect(lambda: self.apply_stylesheet('light'))
         theme_group.addAction(light_theme_action)
         view_menu.addAction(light_theme_action)
 
-        # Dark Theme Action
         dark_theme_action = QAction("Dark Mode", self)
         dark_theme_action.setCheckable(True)
         dark_theme_action.triggered.connect(lambda: self.apply_stylesheet('dark'))
         theme_group.addAction(dark_theme_action)
         view_menu.addAction(dark_theme_action)
 
-        # Add the view menu to the menu bar
         menu_bar.addMenu(view_menu)
 
-        # **Apply the default stylesheet**
         self.apply_stylesheet('light')
 
         tools_menu = QMenu('Tools', self)
@@ -160,7 +149,6 @@ class MainWindow(QMainWindow):
         help_menu.addAction("About")
         help_menu.triggered.connect(lambda: AboutDialog(self).exec_())
 
-        # Add "Options" menu for API key configuration
         options_menu = QMenu('Options', self)
         api_key_action = QAction("API Keys", self)
         api_key_action.triggered.connect(self.show_api_key_dialog)
@@ -176,33 +164,26 @@ class MainWindow(QMainWindow):
         self.main_toolbar = QToolBar('Main Toolbar', self)
         self.main_toolbar.setToolTip("Main Toolbar")
 
-        # add load image button to the toolbar
         load_image_action = QAction(QIcon('Icons/icons8-evidence-48.png'), "Load Image", self)
         load_image_action.triggered.connect(self.load_image_evidence)
         self.main_toolbar.addAction(load_image_action)
 
-        # add remove image button to the toolbar
         remove_image_action = QAction(QIcon('Icons/icons8-evidence-96.png'), "Remove Image", self)
         remove_image_action.triggered.connect(self.remove_image_evidence)
         self.main_toolbar.addAction(remove_image_action)
 
-        # add the separator
         self.main_toolbar.addSeparator()
 
-        # Initialize and add the verify image action
         self.verify_image_button = QAction(QIcon('Icons/icons8-verify-blue.png'), "Verify Image", self)
         self.verify_image_button.triggered.connect(self.verify_image)
         self.main_toolbar.addAction(self.verify_image_button)
 
-        # add the separator
         self.main_toolbar.addSeparator()
 
-        # Initialize and add the mount image action
         self.mount_image_button = QAction(QIcon('Icons/devices/icons8-hard-disk-48.png'), "Mount Image", self)
         self.mount_image_button.triggered.connect(self.image_manager.mount_image)
         self.main_toolbar.addAction(self.mount_image_button)
 
-        # Initialize and add the unmount image action
         self.unmount_image_button = QAction(QIcon('Icons/devices/icons8-hard-disk-48_red.png'), "Unmount Image",
                                             self)
         self.unmount_image_button.triggered.connect(self.image_manager.dismount_image)
@@ -230,24 +211,21 @@ class MainWindow(QMainWindow):
         self.listing_table.setSortingEnabled(True)
         self.listing_table.verticalHeader().setVisible(False)
 
-        # Use alternate row colors
         self.listing_table.setAlternatingRowColors(True)
         self.listing_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.listing_table.setIconSize(QSize(24, 24))
         self.listing_table.setColumnCount(8)
 
-        # Set the horizontal header with dynamic resizing
         header = self.listing_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)  # Name column stretches dynamically
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Inode column resizes based on content
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Type column resizes based on content
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Size column resizes based on content
-        header.setSectionResizeMode(4, QHeaderView.Stretch)  # Created Date column stretches dynamically
-        header.setSectionResizeMode(5, QHeaderView.Stretch)  # Accessed Date column stretches dynamically
-        header.setSectionResizeMode(6, QHeaderView.Stretch)  # Modified Date column stretches dynamically
-        header.setSectionResizeMode(7, QHeaderView.Stretch)  # Changed Date column stretches dynamically
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.Stretch)
+        header.setSectionResizeMode(6, QHeaderView.Stretch)
+        header.setSectionResizeMode(7, QHeaderView.Stretch)
 
-        # Set the header labels
         self.listing_table.setHorizontalHeaderLabels(
             ['Name', 'Inode', 'Type', 'Size', 'Created Date', 'Accessed Date', 'Modified Date', 'Changed Date']
         )
@@ -257,9 +235,8 @@ class MainWindow(QMainWindow):
         self.listing_table.customContextMenuRequested.connect(self.open_listing_context_menu)
         self.listing_table.setSelectionBehavior(QTableWidget.SelectRows)
 
-        # Set the color of the selected row
         palette = self.listing_table.palette()
-        palette.setBrush(QPalette.Highlight, QBrush(Qt.lightGray))  # Change Qt.lightGray to your preferred color
+        palette.setBrush(QPalette.Highlight, QBrush(Qt.lightGray))
         self.listing_table.setPalette(palette)
 
         header = self.listing_table.horizontalHeader()
@@ -273,19 +250,15 @@ class MainWindow(QMainWindow):
         self.registry_extractor_widget = RegistryExtractor(self.image_handler)
         self.result_viewer.addTab(self.registry_extractor_widget, 'Registry')
 
-        # #add tab for displaying all files chosen by user
         self.file_search_widget = FileSearchWidget(self.image_handler)
         self.result_viewer.addTab(self.file_search_widget, 'File Search')
 
-        # Add mind map widget for filesystem visualization
         self.mindmap_widget = MindMapWidget()
         self.result_viewer.addTab(self.mindmap_widget, 'Mind Map')
 
-        # Add priority tab for risk-scored artifacts
         self.priority_widget = PriorityTab(self)
         self.result_viewer.addTab(self.priority_widget, 'Priority')
 
-        # Add case audit tab for forensic accountability
         self.case_audit_widget = CaseAuditTab(self)
         self.result_viewer.addTab(self.case_audit_widget, 'Case Audit')
 
@@ -311,7 +284,6 @@ class MainWindow(QMainWindow):
         self.virus_total_api = VirusTotal()
         self.viewer_tab.addTab(self.virus_total_api, 'Virus Total API')
 
-        # Set the API key if it exists
         virus_total_key = self.api_keys.get('API_KEYS', 'virustotal', fallback='')
         self.virus_total_api.set_api_key(virus_total_key)
 
@@ -324,14 +296,13 @@ class MainWindow(QMainWindow):
         self.viewer_dock.visibilityChanged.connect(self.on_viewer_dock_focus)
         self.viewer_tab.currentChanged.connect(self.display_content_for_active_tab)
 
-        # disable all tabs before loading an image file
         self.enable_tabs(False)
 
     def apply_stylesheet(self, theme='light'):
         if theme == 'dark':
             qss_file = 'styles/dark_theme.qss'
         else:
-            qss_file = 'styles/light_theme.qss'  # Ensure your existing QSS file is named 'light_theme.qss'
+            qss_file = 'styles/light_theme.qss'
 
         try:
             with open(qss_file, 'r') as f:
@@ -341,17 +312,14 @@ class MainWindow(QMainWindow):
             print(f"Error loading stylesheet {qss_file}: {e}")
 
     def show_api_key_dialog(self):
-        # Create a dialog to get API keys from the user
         dialog = QDialog(self)
         dialog.setWindowTitle("API Key Configuration")
-        dialog.setFixedWidth(600)  # Set a fixed width to accommodate longer API keys
+        dialog.setFixedWidth(600)
 
-        # Set layout as a form layout for better presentation
         layout = QFormLayout()
-        layout.setSpacing(10)  # Add some spacing between fields
-        layout.setContentsMargins(15, 15, 15, 15)  # Set content margins for better visual aesthetics
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
 
-        # Groq API Key (for AI Analysis)
         groq_label = QLabel("Groq API Key (AI Analysis):")
         groq_input = QLineEdit()
         groq_input.setText(self.api_keys.get('API_KEYS', 'groq', fallback=''))
@@ -359,33 +327,28 @@ class MainWindow(QMainWindow):
         groq_input.setPlaceholderText("Get free key at console.groq.com")
         layout.addRow(groq_label, groq_input)
 
-        # VirusTotal API Key
         virus_total_label = QLabel("VirusTotal API Key:")
         virus_total_input = QLineEdit()
         virus_total_input.setText(self.api_keys.get('API_KEYS', 'virustotal', fallback=''))
-        virus_total_input.setMinimumWidth(400)  # Set a minimum width for the input field
+        virus_total_input.setMinimumWidth(400)
         layout.addRow(virus_total_label, virus_total_input)
 
-        # Veriphone API Key
         veriphone_label = QLabel("Veriphone API Key:")
         veriphone_input = QLineEdit()
         veriphone_input.setText(self.api_keys.get('API_KEYS', 'veriphone', fallback=''))
-        veriphone_input.setMinimumWidth(400)  # Set a minimum width for the input field
+        veriphone_input.setMinimumWidth(400)
         layout.addRow(veriphone_label, veriphone_input)
 
-        # Buttons
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(
             lambda: self.save_api_keys(groq_input.text(), virus_total_input.text(), veriphone_input.text(), dialog))
         button_box.rejected.connect(dialog.reject)
         layout.addRow(button_box)
 
-        # Set layout and execute dialog
         dialog.setLayout(layout)
         dialog.exec_()
 
     def save_api_keys(self, groq_key, virus_total_key, veriphone_key, dialog):
-        # Save the API keys in a configuration file
         if not self.api_keys.has_section('API_KEYS'):
             self.api_keys.add_section('API_KEYS')
 
@@ -398,15 +361,12 @@ class MainWindow(QMainWindow):
 
         dialog.accept()
 
-        # Pass the updated API keys to the appropriate modules
-        # Update Groq AI service with new key
         from managers.ai_service import get_ai_service
         ai_service = get_ai_service()
         ai_service.set_api_key(groq_key)
 
         self.virus_total_api.set_api_key(virus_total_key)
 
-        # Set Veriphone API key only if the widget is created
         if hasattr(self, 'veriphone_widget'):
             self.veriphone_widget.set_api_key(veriphone_key)
 
@@ -416,7 +376,6 @@ class MainWindow(QMainWindow):
         acquire_dialog.exec_()
 
     def show_conversion_widget(self):
-        # Show the conversion widget
         self.select_dialog = Main()
         self.select_dialog.show()
 
@@ -438,25 +397,19 @@ class MainWindow(QMainWindow):
             'has_data': False
         }
 
-        # Check if we have an image loaded
         if not self.image_handler or not self.current_image_path:
             return session_data
 
-        # Collect all files from all partitions recursively
         try:
-            # Get all root items from the tree
             root_items_count = self.tree_viewer.topLevelItemCount()
 
             for i in range(root_items_count):
                 root_item = self.tree_viewer.topLevelItem(i)
                 item_text = root_item.text(0)
 
-                # Check if this root item has children (partitions)
                 child_count = root_item.childCount()
 
                 if child_count > 0:
-                    # This is an image file with partition children
-                    # Process each partition child
                     for j in range(child_count):
                         child_item = root_item.child(j)
                         child_data = child_item.data(0, Qt.UserRole)
@@ -465,11 +418,9 @@ class MainWindow(QMainWindow):
                         if not child_data:
                             continue
 
-                        # Skip unallocated space entries
                         if child_data.get("is_unallocated"):
                             continue
 
-                        # Get partition offset
                         start_offset = child_data.get("start_offset")
                         if start_offset is None:
                             continue
@@ -477,22 +428,19 @@ class MainWindow(QMainWindow):
                         self._collect_files_recursive(
                             session_data,
                             start_offset,
-                            inode=None,  # Start from root
+                            inode=None,
                             path_prefix="",
                             partition_name=child_text
                         )
                 else:
-                    # This is a direct partition item (no children)
                     item_data = root_item.data(0, Qt.UserRole)
 
                     if not item_data:
                         continue
 
-                    # Skip unallocated space entries
                     if item_data.get("is_unallocated"):
                         continue
 
-                    # Get partition offset
                     start_offset = item_data.get("start_offset")
                     if start_offset is None:
                         continue
@@ -500,7 +448,7 @@ class MainWindow(QMainWindow):
                     self._collect_files_recursive(
                         session_data,
                         start_offset,
-                        inode=None,  # Start from root
+                        inode=None,
                         path_prefix="",
                         partition_name=item_text
                     )
@@ -525,21 +473,17 @@ class MainWindow(QMainWindow):
             partition_name: Name of the partition for debug output
         """
         try:
-            # Get directory contents
             entries = self.image_handler.get_directory_contents(start_offset, inode)
 
             for entry in entries:
                 entry_name = entry.get("name", "")
 
-                # Skip . and .. entries
                 if entry_name in [".", ".."]:
                     continue
 
-                # Build full path
                 full_path = f"{path_prefix}/{entry_name}" if path_prefix else entry_name
 
                 if entry.get("is_directory"):
-                    # Recursively process subdirectory
                     self._collect_files_recursive(
                         session_data,
                         start_offset,
@@ -548,9 +492,8 @@ class MainWindow(QMainWindow):
                         partition_name
                     )
                 else:
-                    # This is a file - add it to session data
                     file_info = {
-                        'name': full_path,  # Full path to file
+                        'name': full_path,
                         'inode': str(entry.get("inode_number", "")),
                         'type': entry.get("type", ""),
                         'size': str(entry.get("size", 0)),
@@ -560,7 +503,6 @@ class MainWindow(QMainWindow):
                         'changed': entry.get("changed", "")
                     }
 
-                    # Parse size to bytes
                     try:
                         size_bytes = int(entry.get("size", 0))
                     except:
@@ -571,18 +513,14 @@ class MainWindow(QMainWindow):
                     session_data['total_size'] += size_bytes
 
         except Exception as e:
-            # Continue processing even if one directory fails
             pass
 
     def show_report_generator_dialog(self):
         """Show the forensic report generator dialog."""
-        # Pass current image path if available
         current_image = self.current_image_path if hasattr(self, 'current_image_path') else None
 
-        # Export current session data (silently, no popup)
         session_data = self.export_current_session_data()
 
-        # Pass both image path and session data to dialog
         report_dialog = ReportGeneratorDialog(
             self,
             current_image_path=current_image,
@@ -591,10 +529,8 @@ class MainWindow(QMainWindow):
         report_dialog.exec_()
 
     def show_veriphone_widget(self):
-        # Create the VeriphoneWidget only if it hasn't been created yet
         if not hasattr(self, 'veriphone_widget'):
             self.veriphone_widget = VeriphoneWidget()
-            # Set the API key after creating the widget
             veriphone_key = self.api_keys.get('API_KEYS', 'veriphone', fallback='')
             self.veriphone_widget.set_api_key(veriphone_key)
         self.veriphone_widget.show()
@@ -604,7 +540,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Verify Image", "No image is currently loaded.")
             return
 
-        # Show the verification widget (assuming it handles its own verification logic)
         self.verification_widget = VerificationWidget(self.image_handler)
         self.verification_widget.show()
 
@@ -640,10 +575,10 @@ class MainWindow(QMainWindow):
         return item
 
     def on_viewer_dock_focus(self, visible):
-        if visible:  # If the QDockWidget is focused/visible
-            self.viewer_dock.setMaximumSize(16777215, 16777215)  # Remove size constraints
-        else:  # If the QDockWidget loses focus
-            current_height = self.viewer_dock.size().height()  # Get the current height
+        if visible:
+            self.viewer_dock.setMaximumSize(16777215, 16777215)
+        else:
+            current_height = self.viewer_dock.size().height()
             self.viewer_dock.setMinimumSize(1200, current_height)
             self.viewer_dock.setMaximumSize(1200, current_height)
 
@@ -681,7 +616,6 @@ class MainWindow(QMainWindow):
                                                       QMessageBox.StandardButton.Yes)
 
                 if dismount_reply == QMessageBox.StandardButton.Yes:
-                    # Assuming you have a method to dismount the image
                     self.image_manager.dismount_image()
 
             event.accept()
@@ -690,7 +624,6 @@ class MainWindow(QMainWindow):
 
     def load_image_evidence(self):
         """Open an image with a specific filter on Kali Linux."""
-        # Define the supported image file extensions, including both lowercase and uppercase variants
         supported_image_extensions = ["*.e01", "*.E01", "*.s01", "*.S01",
                                       "*.l01", "*.L01", "*.raw", "*.RAW",
                                       "*.img", "*.IMG", "*.dd", "*.DD",
@@ -698,20 +631,17 @@ class MainWindow(QMainWindow):
                                       "*.001", "*.s01", "*.ex01", "*.dmg",
                                       "*.sparse", "*.sparseimage"]
 
-        # Construct the file filter string with both uppercase and lowercase extensions
         file_filter = "Supported Image Files ({})".format(" ".join(supported_image_extensions))
 
-        # Open file dialog with the specified file filter
         image_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", file_filter)
 
         if image_path:
             image_path = os.path.normpath(image_path)
-            self.image_handler = ImageHandler(image_path)  # Create or update the ImageHandler instance
+            self.image_handler = ImageHandler(image_path)
             self.evidence_files.append(image_path)
-            self.current_image_path = image_path  # ensure this line is present
+            self.current_image_path = image_path
             self.load_partitions_into_tree(image_path)
 
-            # Pass the image handler to the widgets
             self.deleted_files_widget.set_image_handler(self.image_handler)
             self.registry_extractor_widget.image_handler = self.image_handler
             self.file_search_widget.image_handler = self.image_handler
@@ -727,7 +657,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Remove Evidence", "No evidence is currently loaded.")
             return
 
-        # Prepare the options for the dialog
         options = self.evidence_files + ["Remove All"]
         selected_option, ok = QInputDialog.getItem(self, "Remove Evidence File",
                                                    "Select an evidence file to remove or 'Remove All':",
@@ -735,22 +664,17 @@ class MainWindow(QMainWindow):
 
         if ok:
             if selected_option == "Remove All":
-                # Remove all evidence files
-                self.tree_viewer.invisibleRootItem().takeChildren()  # Remove all children from the tree viewer
-                self.clear_ui()  # Clear the UI
+                self.tree_viewer.invisibleRootItem().takeChildren()
+                self.clear_ui()
                 QMessageBox.information(self, "Remove Evidence", "All evidence files have been removed.")
             else:
-                # Remove the selected evidence file
                 self.evidence_files.remove(selected_option)
                 self.remove_from_tree_viewer(selected_option)
                 self.clear_ui()
                 QMessageBox.information(self, "Remove Evidence", f"{selected_option} has been removed.")
-        # clear all tabs if there are no evidence files loaded
         if not self.evidence_files:
             self.clear_ui()
-            # disable all tabs
             self.enable_tabs(False)
-            # set the icon back to the original
             self.verify_image_button.setIcon(QIcon('Icons/icons8-verify-blue.png'))
 
     def remove_from_tree_viewer(self, evidence_name):
@@ -769,13 +693,10 @@ class MainWindow(QMainWindow):
 
         partitions = self.image_handler.get_partitions()
 
-        # Check if the image has partitions or a recognizable file system
         if not partitions:
             if self.image_handler.has_filesystem(0):
-                # The image has a filesystem but no partitions, populate root directory
                 self.populate_contents(root_item_tree, {"start_offset": 0})
             else:
-                # Entire image is considered as unallocated space
                 size_in_bytes = self.image_handler.get_size()
                 readable_size = self.image_handler.get_readable_size(size_in_bytes)
                 unallocated_item_text = f"Unallocated Space: Size: {readable_size}"
@@ -796,7 +717,6 @@ class MainWindow(QMainWindow):
             data = {"inode_number": None, "start_offset": start, "end_offset": end}
             item = self.create_tree_item(root_item_tree, item_text, icon_path, data)
 
-            # Determine if the partition is special or contains unallocated space
             special_partitions = ["Primary Table", "Safety Table", "GPT Header"]
             is_special = any(special_case in desc_str for special_case in special_partitions)
             is_unallocated = "Unallocated" in desc_str or "Microsoft reserved" in desc_str
@@ -805,7 +725,6 @@ class MainWindow(QMainWindow):
                 item.setChildIndicatorPolicy(QTreeWidgetItem.DontShowIndicator)
             elif is_unallocated:
                 item.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
-                # Directly add unallocated space under the partition
                 self.create_tree_item(item, f"Unallocated Space: Size: {readable_size}",
                                       self.db_manager.get_icon_path('file', 'unknown'),
                                       {"is_unallocated": True, "start_offset": start, "end_offset": end})
@@ -841,7 +760,6 @@ class MainWindow(QMainWindow):
         if is_directory:
             icon_key = 'folder'
         else:
-            # For files, determine the icon based on the file extension
             file_extension = entry_name.split('.')[-1].lower() if '.' in entry_name else 'unknown'
             icon_key = file_extension
 
@@ -856,7 +774,6 @@ class MainWindow(QMainWindow):
         })
 
     def on_item_expanded(self, item):
-        # Check if the item already has children; if so, don't repopulate
         if item.childCount() > 0:
             return
 
@@ -864,9 +781,9 @@ class MainWindow(QMainWindow):
         if data is None:
             return
 
-        if data.get("inode_number") is None:  # It's a partition
+        if data.get("inode_number") is None:
             self.populate_contents(item, data)
-        else:  # It's a directory
+        else:
             self.populate_contents(item, data, data.get("inode_number"))
 
     def on_item_clicked(self, item, column):
@@ -874,34 +791,27 @@ class MainWindow(QMainWindow):
 
         data = item.data(0, Qt.UserRole)
         self.current_selected_data = data
-        self.current_file_content = None  # Clear cached content for regular files
+        self.current_file_content = None
 
         if data.get("is_unallocated"):
-            # Handle unallocated space
             unallocated_space = self.image_handler.read_unallocated_space(data["start_offset"], data["end_offset"])
             if unallocated_space is not None:
-                # use the update_viewer_with_file_content method to display the unallocated space for hex and text tabs
-                # self.update_viewer_with_file_content(unallocated_space, None, data)
-                self.update_viewer_with_file_content(unallocated_space, data)  ######
+                self.update_viewer_with_file_content(unallocated_space, data)
             else:
                 print("Invalid size for unallocated space or unable to read.")
         elif data.get("type") == "directory":
-            # # Handle directories
             entries = self.image_handler.get_directory_contents(data["start_offset"], data.get("inode_number"))
             self.populate_listing_table(entries, data["start_offset"])
         elif data.get("inode_number") is not None:
-            # Handle files
             file_content, _ = self.image_handler.get_file_content(data["inode_number"], data[
-                "start_offset"])  ##################################
+                "start_offset"])
             if file_content:
                 self.update_viewer_with_file_content(file_content, data)
             else:
                 print("Unable to read file content.")
         elif data.get("start_offset") is not None:
-            # Handle partitions
-            entries = self.image_handler.get_directory_contents(data["start_offset"], 5)  # 5 is the root inode for NTFS
+            entries = self.image_handler.get_directory_contents(data["start_offset"], 5)
             self.populate_listing_table(entries, data["start_offset"])
-            # Update mind map with partition offset
             if self.mindmap_widget and self.image_handler:
                 self.mindmap_widget.set_image_handler(self.image_handler, data["start_offset"])
         else:
@@ -913,36 +823,34 @@ class MainWindow(QMainWindow):
         if not self.current_selected_data:
             return
 
-        # Handle carved files differently - they use stored content
         if self.current_selected_data.get("is_carved"):
             if self.current_file_content:
                 self.update_viewer_with_file_content(self.current_file_content, self.current_selected_data)
             return
 
-        # Handle regular files from disk image
         inode_number = self.current_selected_data.get("inode_number")
         offset = self.current_selected_data.get("start_offset", self.current_offset)
 
         if inode_number:
             file_content, _ = self.image_handler.get_file_content(inode_number, offset)
             if file_content:
-                self.update_viewer_with_file_content(file_content, self.current_selected_data)  # Use the stored data
+                self.update_viewer_with_file_content(file_content, self.current_selected_data)
 
     def update_viewer_with_file_content(self, file_content, data):
         index = self.viewer_tab.currentIndex()
-        if index == 0:  # Hex tab
+        if index == 0:
             self.hex_viewer.display_hex_content(file_content)
-        elif index == 1:  # Text tab
+        elif index == 1:
             self.text_viewer.display_text_content(file_content)
-        elif index == 2:  # Application tab
-            full_file_path = data.get("name", "")  # Retrieve the name from the data dictionary
+        elif index == 2:
+            full_file_path = data.get("name", "")
             self.application_viewer.display_application_content(file_content, full_file_path)
-        elif index == 3:  # File Metadata tab
+        elif index == 3:
             self.metadata_viewer.display_metadata(data)
 
-        elif index == 4:  # Exif Data tab
+        elif index == 4:
             self.exif_viewer.load_and_display_exif_data(file_content)
-        elif index == 5:  # Assuming VirusTotal tab is the 6th tab (0-based index)
+        elif index == 5:
             file_hash = hashlib.md5(file_content).hexdigest()
             self.virus_total_api.set_file_hash(file_hash)
             self.virus_total_api.set_file_content(file_content, data.get("name", ""))
@@ -955,7 +863,6 @@ class MainWindow(QMainWindow):
             inode_number = entry["inode_number"]
             description = "Directory" if entry["is_directory"] else "File"
             size_in_bytes = entry["size"] if "size" in entry else 0
-            # readable_size = self.get_readable_size(size_in_bytes)
             readable_size = self.image_handler.get_readable_size(size_in_bytes)
             created = entry["created"] if "created" in entry else None
             accessed = entry["accessed"] if "accessed" in entry else None
@@ -1002,7 +909,7 @@ class MainWindow(QMainWindow):
         data = self.listing_table.item(row, 0).data(Qt.UserRole)
 
         self.current_selected_data = data
-        self.current_file_content = None  # Clear cached content for regular files
+        self.current_file_content = None
 
         if data.get("type") == "directory":
             entries = self.image_handler.get_directory_contents(data["start_offset"], inode_number)
@@ -1012,19 +919,16 @@ class MainWindow(QMainWindow):
             if file_content:
                 self.update_viewer_with_file_content(file_content, data)
 
-        # Call this to make sure the content is displayed based on the active tab
         self.display_content_for_active_tab()
 
     def open_listing_context_menu(self, position):
-        # Get the selected item
         indexes = self.listing_table.selectedIndexes()
         if indexes:
             selected_item = self.listing_table.item(indexes[0].row(),
-                                                    0)  # Assuming the first column contains the item data
+                                                    0)
             data = selected_item.data(Qt.UserRole)
             menu = QMenu()
 
-            # Add the 'Export' option for any file or folder
             export_action = menu.addAction("Export")
             export_action.triggered.connect(lambda: self.export_item_from_table(data))
 
@@ -1039,18 +943,15 @@ class MainWindow(QMainWindow):
                 self.export_file(data["inode_number"], data["start_offset"], dest_dir, data["name"])
 
     def open_tree_context_menu(self, position):
-        # Get the selected item
         indexes = self.tree_viewer.selectedIndexes()
         if indexes:
             selected_item = self.tree_viewer.itemFromIndex(indexes[0])
             menu = QMenu()
 
-            # Check if the selected item is a root item
             if selected_item and selected_item.parent() is None:
                 view_os_info_action = menu.addAction("View Image Information")
                 view_os_info_action.triggered.connect(lambda: self.view_os_information(indexes[0]))
 
-            # Add the 'Export' option for any file or folder
             export_action = menu.addAction("Export")
             export_action.triggered.connect(self.export_item)
 
@@ -1089,7 +990,6 @@ class MainWindow(QMainWindow):
     def view_os_information(self, index):
         item = self.tree_viewer.itemFromIndex(index)
         if item is None or item.parent() is not None:
-            # Ensure that only the root item triggers the OS information display
             return
 
         partitions = self.image_handler.get_partitions()
@@ -1101,11 +1001,11 @@ class MainWindow(QMainWindow):
         table.horizontalHeader().setFont(QFont("Arial", 10, QFont.Bold))
         table.verticalHeader().setVisible(False)
 
-        partition_icon = QIcon('Icons/devices/drive-harddisk.svg')  # Replace with your partition icon path
-        os_icon = QIcon('Icons/start-here.svg')  # Replace with your OS icon path
+        partition_icon = QIcon('Icons/devices/drive-harddisk.svg')
+        os_icon = QIcon('Icons/start-here.svg')
 
         for row, part in enumerate(partitions):
-            start_offset = part[2]  # Start offset of the partition
+            start_offset = part[2]
             fs_type = self.image_handler.get_fs_type(start_offset)
 
             os_version = None
@@ -1127,7 +1027,6 @@ class MainWindow(QMainWindow):
         table.resizeRowsToContents()
         table.resizeColumnsToContents()
 
-        # Dialog for displaying the table
         dialog = QDialog(self)
         dialog.setWindowTitle("OS and File System Information")
         dialog.resize(460, 320)

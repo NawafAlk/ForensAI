@@ -21,7 +21,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-# Platform-specific imports
 try:
     import pefile
     PE_AVAILABLE = True
@@ -73,7 +72,6 @@ class SignatureInfo:
 class PESignatureVerifier:
     """Verifies digital signatures on PE files"""
 
-    # Known trusted publishers
     TRUSTED_PUBLISHERS = {
         'Microsoft Corporation',
         'Microsoft Windows',
@@ -115,22 +113,17 @@ class PESignatureVerifier:
             return SignatureInfo(error="pefile library not available")
 
         try:
-            # Load PE file
             pe = pefile.PE(file_path)
 
-            # Check if file has signature
             if not hasattr(pe, 'DIRECTORY_ENTRY_SECURITY'):
                 return SignatureInfo(
                     is_signed=False,
                     error=None
                 )
 
-            # Extract signature data
             signature_data = pe.DIRECTORY_ENTRY_SECURITY[0]
             cert_data = signature_data.VirtualAddress
 
-            # Parse certificate (simplified - full parsing would require more libraries)
-            # In production, would use wincertstore or signify for full verification
             sig_info = self._parse_signature_basic(pe, file_path)
 
             return sig_info
@@ -148,7 +141,6 @@ class PESignatureVerifier:
         sig_info = SignatureInfo(is_signed=True)
 
         try:
-            # Get file version info if available
             if hasattr(pe, 'VS_VERSIONINFO') and hasattr(pe, 'FileInfo'):
                 for file_info in pe.FileInfo:
                     if hasattr(file_info, 'StringTable'):
@@ -158,22 +150,18 @@ class PESignatureVerifier:
                                 if key == b'CompanyName':
                                     sig_info.signer = value.decode('utf-8', errors='ignore')
                                 elif key == b'ProductName':
-                                    # Additional info
                                     pass
 
-            # Check if signer is in trusted list
             if sig_info.signer:
                 sig_info.is_trusted = any(
                     trusted in sig_info.signer
                     for trusted in self.TRUSTED_PUBLISHERS
                 )
 
-            # Basic validation: File has signature section
-            sig_info.is_valid = True  # Simplified - would need full chain validation
+            sig_info.is_valid = True
 
-            # Set defaults
             sig_info.algorithm = "Unknown (full validation unavailable)"
-            sig_info.trust_chain_valid = False  # Would need Windows cert store integration
+            sig_info.trust_chain_valid = False
 
         except Exception as e:
             sig_info.error = f"Parsing error: {str(e)}"
@@ -190,8 +178,6 @@ class PESignatureVerifier:
         if os.name != 'nt':
             return SignatureInfo(error="Advanced verification only available on Windows")
 
-        # TODO: Implement using Windows WinVerifyTrust API via ctypes
-        # For now, fall back to basic verification
         return self.verify_file(file_path)
 
     def extract_certificate_info(self, file_path: str) -> Dict:
@@ -227,7 +213,6 @@ class PESignatureVerifier:
         if not file_path or not os.path.exists(file_path):
             return None
 
-        # Check if it's a PE file
         filename = file_data.get('name', '').lower()
         if not any(filename.endswith(ext) for ext in ['.exe', '.dll', '.sys', '.scr']):
             return SignatureInfo(error="Not a PE file")
@@ -284,7 +269,6 @@ class SignatureCacheManager:
         self._save_cache()
 
 
-# Singleton instance
 _pe_verifier = None
 _sig_cache = None
 

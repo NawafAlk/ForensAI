@@ -23,9 +23,8 @@ class DiskInfo:
     size_gb: float = 0.0
     serial: str = "Unknown"
     interface: str = "Unknown"
-    # Platform-specific identifiers
-    number: Optional[int] = None  # Windows: PhysicalDrive number
-    name: Optional[str] = None    # Linux: device name (sda, nvme0n1)
+    number: Optional[int] = None
+    name: Optional[str] = None
 
     def __post_init__(self):
         if self.size > 0 and self.size_gb == 0.0:
@@ -42,11 +41,11 @@ class PartitionInfo:
     free_space_gb: float = 0.0
     file_system: str = "Unknown"
     label: str = ""
-    mount_point: Optional[str] = None  # Linux: /mnt/data, Windows: C:
-    drive_letter: Optional[str] = None  # Windows only
+    mount_point: Optional[str] = None
+    drive_letter: Optional[str] = None
     partition_type: str = "Unknown"
     bootable: bool = False
-    disk_device: Optional[str] = None  # Parent disk device
+    disk_device: Optional[str] = None
 
     def __post_init__(self):
         if self.size > 0 and self.size_gb == 0.0:
@@ -59,7 +58,7 @@ class PartitionInfo:
 class AcquisitionResult:
     """Result of an acquisition operation."""
     success: bool
-    status: str  # "complete", "aborted", "failed"
+    status: str
     output_path: str
     device_path: str
     bytes_written: int = 0
@@ -92,12 +91,8 @@ class AcquisitionResult:
         return result
 
 
-# Type alias for progress callback
-# callback(bytes_read: int, total_bytes: Optional[int], speed_mbps: float)
 ProgressCallback = Callable[[int, Optional[int], float], None]
 
-# Type alias for abort check
-# Returns True to abort acquisition
 AbortCheck = Callable[[], bool]
 
 
@@ -206,5 +201,4 @@ class BaseAcquirer(ABC):
         Returns:
             Size in bytes or None if unknown
         """
-        # Default implementation - subclasses can override
         return None

@@ -15,32 +15,26 @@ import pytsk3
 import tempfile
 from collections import OrderedDict
 
-SECTOR_SIZE = 512  # 512 bytes per sector
+SECTOR_SIZE = 512
 
-# Magic bytes for supported image formats
 MAGIC_BYTES = {
-    'ewf': [b'EVF\x09\x0d\x0a\xff\x00', b'LVF\x09\x0d\x0a\xff\x00'],  # E01/L01/Ex01
-    'raw': None,  # RAW images have no magic bytes
+    'ewf': [b'EVF\x09\x0d\x0a\xff\x00', b'LVF\x09\x0d\x0a\xff\x00'],
+    'raw': None,
 }
 
-# Maximum file size for single-file reads (1GB safety limit)
 MAX_FILE_READ_SIZE = 1 * 1024 * 1024 * 1024
 
 
 def validate_image_path(image_path: str) -> str:
     """Validate and sanitize an image file path."""
-    # Normalize the path
     image_path = os.path.normpath(os.path.abspath(image_path))
 
-    # Check for path traversal attempts
     if '..' in image_path.split(os.sep):
         raise ValueError(f"Path traversal detected in: {image_path}")
 
-    # Check file exists
     if not os.path.isfile(image_path):
         raise FileNotFoundError(f"Image file not found: {image_path}")
 
-    # Check file is readable
     if not os.access(image_path, os.R_OK):
         raise PermissionError(f"Cannot read image file: {image_path}")
 
@@ -51,7 +45,7 @@ def validate_magic_bytes(image_path: str, image_type: str) -> bool:
     """Validate file magic bytes match expected format."""
     expected = MAGIC_BYTES.get(image_type)
     if expected is None:
-        return True  # RAW images have no magic bytes to validate
+        return True
 
     try:
         with open(image_path, 'rb') as f:
@@ -64,7 +58,7 @@ def validate_magic_bytes(image_path: str, image_type: str) -> bool:
 class LRUCache:
     """LRU cache with configurable max size in bytes."""
 
-    def __init__(self, max_size_bytes=100 * 1024 * 1024):  # 100MB default
+    def __init__(self, max_size_bytes=100 * 1024 * 1024):
         self._cache = OrderedDict()
         self._max_size = max_size_bytes
         self._current_size = 0
@@ -82,7 +76,7 @@ class LRUCache:
     def put(self, key, value):
         value_size = len(value) if isinstance(value, (bytes, bytearray)) else 0
         if value_size > self._max_size:
-            return  # Don't cache items larger than max
+            return
 
         if key in self._cache:
             old_value = self._cache[key]
@@ -113,7 +107,6 @@ class LRUCache:
         }
 
 
-# Class to handle EWF images
 class EWFImgInfo(pytsk3.Img_Info):
     def __init__(self, ewf_handle):
         self._ewf_handle = ewf_handle
@@ -132,25 +125,22 @@ class EWFImgInfo(pytsk3.Img_Info):
 
 class ImageHandler:
     def __init__(self, image_path):
-        self.image_path = validate_image_path(image_path)  # Validated path
-        self.img_info = None  # Initialized once
-        self.volume_info = None  # Initialized once
-        self.fs_info_cache = {}  # Cache for FS_Info objects, keyed by start offset
+        self.image_path = validate_image_path(image_path)
+        self.img_info = None
+        self.volume_info = None
+        self.fs_info_cache = {}
 
-        self.fs_info = None  # Added to check for direct filesystem
-        self.is_wiped_image = False  # Indicator if image is wiped
+        self.fs_info = None
+        self.is_wiped_image = False
 
-        # Read cache for frequently accessed data
-        self._read_cache = LRUCache(max_size_bytes=100 * 1024 * 1024)  # 100MB
-        # Directory listing cache
+        self._read_cache = LRUCache(max_size_bytes=100 * 1024 * 1024)
         self._dir_cache = {}
 
-        # Validate magic bytes before loading
         image_type = self.get_image_type()
         if not validate_magic_bytes(self.image_path, image_type):
             raise ValueError(f"File magic bytes do not match expected format for {image_type}: {self.image_path}")
 
-        self.load_image()  # Load the image
+        self.load_image()
 
     def get_size(self):
         """Returns the size of the disk image."""
@@ -163,7 +153,6 @@ class ImageHandler:
 
     def read(self, offset, size):
         """Reads data from the image starting at `offset` for `size` bytes, with caching."""
-        # Input validation
         if offset < 0:
             raise ValueError(f"Offset must be non-negative, got {offset}")
         if size <= 0:
@@ -217,13 +206,11 @@ class ImageHandler:
             ewf_handle = pyewf.handle()
             ewf_handle.open(filenames)
             try:
-                # Attempt to retrieve the stored hash values
                 stored_md5 = ewf_handle.get_hash_value("MD5")
                 stored_sha1 = ewf_handle.get_hash_value("SHA1")
             except Exception as e:
                 print(f"Unable to retrieve stored hash values: {e}")
 
-            # Calculate the hash values by reading the image file
             while True:
                 chunk = ewf_handle.read(4096)
                 if not chunk:
@@ -241,7 +228,6 @@ class ImageHandler:
                     hash_sha256.update(chunk)
                     size += len(chunk)
 
-        # Compile the computed and stored hashes in a dictionary
         hashes = {
             'computed_md5': hash_md5.hexdigest(),
             'computed_sha1': hash_sha1.hexdigest(),
@@ -271,12 +257,10 @@ class ImageHandler:
             self.volume_info = pytsk3.Volume_Info(self.img_info)
         except Exception:
             self.volume_info = None
-            # Attempt to detect a filesystem directly if no volume info
             try:
                 self.fs_info = pytsk3.FS_Info(self.img_info)
             except Exception:
                 self.fs_info = None
-                # If no volume info and no filesystem, mark as wiped
                 self.is_wiped_image = True
 
     def has_filesystem(self, start_offset):
@@ -284,7 +268,6 @@ class ImageHandler:
         return fs_info is not None
 
     def is_wiped(self):
-        # Image is considered wiped if no volume info, no filesystem detected
         return self.is_wiped_image
 
     def get_partitions(self):
@@ -296,11 +279,6 @@ class ImageHandler:
                     continue
                 partitions.append((partition.addr, partition.desc, partition.start, partition.len))
         elif self.is_wiped():
-            # For a wiped image with no partitions, return a placeholder for unallocated space
-            # This is a simplified representation.
-            # total_size = self.get_size()
-            # partitions.append((0, "Unallocated Space", 0, total_size // SECTOR_SIZE))
-            # don't do nothing
             pass
         return partitions
 
@@ -319,7 +297,6 @@ class ImageHandler:
         try:
             fs_type = self.get_fs_info(start_offset).info.ftype
 
-            # Map the file system type to its name
             if fs_type == pytsk3.TSK_FS_TYPE_NTFS:
                 return "NTFS"
             elif fs_type == pytsk3.TSK_FS_TYPE_FAT12:
@@ -376,12 +353,6 @@ class ImageHandler:
                         if entry.info.meta and entry.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
                             is_directory = True
 
-                        # Define a function to safely get datetime string or None
-                        # def safe_datetime(timestamp):
-                        #     try:
-                        #         return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-                        #     except (OverflowError, OSError, ValueError):
-                        #         return "N/A"
                         def safe_datetime(timestamp):
                             if timestamp is None or timestamp == 0:
                                 return "N/A"
@@ -390,7 +361,6 @@ class ImageHandler:
                             except Exception:
                                 return "N/A"
 
-                        # Decode name with proper error handling for Arabic and special characters
                         try:
                             name = entry.info.name.name.decode('utf-8', errors='replace') if hasattr(entry.info.name, 'name') else None
                         except:
@@ -414,7 +384,6 @@ class ImageHandler:
                 return entries
 
             except Exception as e:
-                # Log the exception for debugging purposes
                 print(f"Error in get_directory_contents: {e}")
                 return []
         return []
@@ -443,7 +412,6 @@ class ImageHandler:
         if not fs_info:
             return None
 
-        # if file system is not ntfs, return unknown OS and exit the function
         if self.get_fs_type(start_offset) != "NTFS":
             return None
 
@@ -452,26 +420,23 @@ class ImageHandler:
         if not software_hive_data:
             return None
 
-        # Create a temporary file and store the hive data
         temp_hive_path = None
         try:
             with tempfile.NamedTemporaryFile(
-                    delete=False) as temp_hive:  # Create a temporary file and store the hive data
-                temp_hive.write(software_hive_data)  # Write the hive data to the temporary file
-                temp_hive_path = temp_hive.name  # Get the path of the temporary file
+                    delete=False) as temp_hive:
+                temp_hive.write(software_hive_data)
+                temp_hive_path = temp_hive.name
 
             if temp_hive_path:
                 reg = Registry.Registry(temp_hive_path)
                 key = reg.open("Microsoft\\Windows NT\\CurrentVersion")
 
-                # Helper function to safely get registry values
                 def get_reg_value(reg_key, value_name):
                     try:
                         return reg_key.value(value_name).value()
                     except Registry.RegistryValueNotFoundException:
                         return "N/A"
 
-                # Fetching registry values
                 product_name = get_reg_value(key, "ProductName")
                 current_version = get_reg_value(key, "CurrentVersion")
                 current_build = get_reg_value(key, "CurrentBuild")
@@ -483,7 +448,6 @@ class ImageHandler:
             else:
                 os_version = "Failed to create temporary hive file"
 
-            # Clean up the temporary file
             if temp_hive_path and os.path.exists(temp_hive_path):
                 os.remove(temp_hive_path)
 
@@ -497,11 +461,11 @@ class ImageHandler:
         try:
             start_byte_offset = start_offset * SECTOR_SIZE
             end_byte_offset = max(end_offset * SECTOR_SIZE, start_byte_offset + SECTOR_SIZE - 1)
-            size_in_bytes = end_byte_offset - start_byte_offset + 1  # Ensuring at least some data is read
+            size_in_bytes = end_byte_offset - start_byte_offset + 1
 
             if size_in_bytes <= 0:
                 print("Invalid size for unallocated space, adjusting to read at least one sector.")
-                size_in_bytes = SECTOR_SIZE  # Adjust to read at least one sector
+                size_in_bytes = SECTOR_SIZE
 
             unallocated_space = self.img_info.read(start_byte_offset, size_in_bytes)
             if unallocated_space is None or len(unallocated_space) == 0:
@@ -554,15 +518,11 @@ class ImageHandler:
             file_extension = os.path.splitext(file_name)[1].lower()
 
             if search_query:
-                # If there's a search query, check if the file name contains the query
                 if search_query.startswith('.'):
-                    # If the search query is an extension (e.g., '.jpg')
                     query_matches = file_extension == search_query.lower()
                 else:
-                    # If the search query is a file name or part of it
                     query_matches = search_query.lower() in file_name.lower()
             else:
-                # If no search query, handle as before based on extensions
                 query_matches = extensions is None or file_extension in extensions or '' in extensions
 
             if entry.info.meta and entry.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
@@ -609,7 +569,6 @@ class ImageHandler:
                 if partition.flags == pytsk3.TSK_VS_PART_FLAG_ALLOC:
                     self.process_partition_search(img_info, partition.start * SECTOR_SIZE, files_list, search_query)
         except IOError:
-            # No volume information, attempt to read as a single filesystem
             self.process_partition_search(img_info, 0, files_list, search_query)
 
         return files_list
@@ -637,7 +596,6 @@ class ImageHandler:
                 print("File has no content or is a special metafile!")
                 return None, None
 
-            # Safety limit: don't read files larger than 1GB into memory
             file_size = file_obj.info.meta.size
             if file_size > MAX_FILE_READ_SIZE:
                 print(f"File too large ({file_size} bytes), reading first {MAX_FILE_READ_SIZE} bytes only")
@@ -657,7 +615,6 @@ class ImageHandler:
         except Exception as e:
             print(f"Error reading file (inode {inode_number}): {e}")
             return None, None
-
 
 
     @staticmethod

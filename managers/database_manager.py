@@ -19,15 +19,12 @@ class DatabaseManager:
     def get_icon_path(self, icon_type, identifier):
         c = self.db_conn.cursor()
         try:
-            # First, try to get the icon for the specific identifier
             c.execute("SELECT path FROM icons WHERE type = ? AND extention = ?", (icon_type, identifier))
             result = c.fetchone()
 
-            # If a specific icon exists for the identifier, return it
             if result:
                 return result[0]
 
-            # If no specific icon exists, check for default icons
             if icon_type == 'folder':
                 c.execute("SELECT path FROM icons WHERE type = ? AND extention = 'folder'", (icon_type,))
 

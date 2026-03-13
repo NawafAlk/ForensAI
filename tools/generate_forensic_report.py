@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 ForensAI - Forensic Report Generation Tool
 ==========================================
@@ -19,7 +18,6 @@ import argparse
 import json
 from pathlib import Path
 
-# Add parent directory to path for module imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modules.forensic_report_generator import ForensicReportGenerator
@@ -37,38 +35,32 @@ def validate_inputs(args):
     """
     errors = []
 
-    # Check master image
     if not os.path.exists(args.master_image):
         errors.append(f"Master image not found: {args.master_image}")
     elif not os.path.isfile(args.master_image):
         errors.append(f"Master image is not a file: {args.master_image}")
 
-    # Check derived ISO (if provided)
     if args.derived_iso:
         if not os.path.exists(args.derived_iso):
             errors.append(f"Derived ISO not found: {args.derived_iso}")
         elif not os.path.isfile(args.derived_iso):
             errors.append(f"Derived ISO is not a file: {args.derived_iso}")
 
-    # Check artifacts directory (if provided)
     if args.artifacts_dir:
         if not os.path.exists(args.artifacts_dir):
             errors.append(f"Artifacts directory not found: {args.artifacts_dir}")
         elif not os.path.isdir(args.artifacts_dir):
             errors.append(f"Artifacts path is not a directory: {args.artifacts_dir}")
 
-    # Check bulk_extractor directory (if provided)
     if args.bulk_extractor_dir:
         if not os.path.exists(args.bulk_extractor_dir):
             errors.append(f"Bulk extractor directory not found: {args.bulk_extractor_dir}")
         elif not os.path.isdir(args.bulk_extractor_dir):
             errors.append(f"Bulk extractor path is not a directory: {args.bulk_extractor_dir}")
 
-    # Validate case ID format
     if not args.case_id or len(args.case_id.strip()) == 0:
         errors.append("Case ID cannot be empty")
 
-    # Validate operator name
     if not args.operator or len(args.operator.strip()) == 0:
         errors.append("Operator name cannot be empty")
 
@@ -190,7 +182,6 @@ For more information:
 """
     )
 
-    # Required arguments
     required_group = parser.add_argument_group('required arguments')
     required_group.add_argument('--case-id', required=True,
                                help='Unique case identifier (e.g., CASE-2025-001)')
@@ -201,7 +192,6 @@ For more information:
     required_group.add_argument('--output-dir', required=True,
                                help='Directory where reports will be saved')
 
-    # Optional arguments
     optional_group = parser.add_argument_group('optional arguments')
     optional_group.add_argument('--derived-iso',
                                help='Path to derived ISO file (optional)')
@@ -214,7 +204,6 @@ For more information:
     optional_group.add_argument('--logfile',
                                help='Path to processing/acquisition logfile')
 
-    # Output configuration
     output_group = parser.add_argument_group('output configuration')
     output_group.add_argument('--formats', nargs='+',
                              default=['html', 'json'],
@@ -227,10 +216,8 @@ For more information:
     output_group.add_argument('--verbose', '-v', action='store_true',
                              help='Enable verbose logging')
 
-    # Parse arguments
     args = parser.parse_args()
 
-    # Configure logging
     if args.verbose:
         import logging
         logging.basicConfig(
@@ -238,7 +225,6 @@ For more information:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
 
-    # Print banner unless JSON output requested
     if not args.json_output:
         print_banner()
         print(f"Case ID: {args.case_id}")
@@ -248,7 +234,6 @@ For more information:
         print(f"Output Formats: {', '.join(args.formats)}")
         print("\nValidating inputs...")
 
-    # Validate inputs
     valid, errors = validate_inputs(args)
     if not valid:
         if args.json_output:
@@ -276,10 +261,8 @@ For more information:
         print("This may take several minutes depending on evidence size.\n")
 
     try:
-        # Create output directory
         os.makedirs(args.output_dir, exist_ok=True)
 
-        # Create report generator
         generator = ForensicReportGenerator(
             case_id=args.case_id,
             operator=args.operator,
@@ -292,19 +275,16 @@ For more information:
             logfile=args.logfile
         )
 
-        # Generate report
         result = generator.generate_report(
             formats=args.formats,
             include_screenshots=args.include_screenshots
         )
 
-        # Output results
         if args.json_output:
             print(json.dumps(result, indent=2))
         else:
             print_summary(result)
 
-        # Exit with appropriate code
         exit_code = 0 if result['status'] in ['success', 'partial'] else 1
         sys.exit(exit_code)
 

@@ -11,7 +11,6 @@ import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from managers.risk_scorer import get_risk_scorer
@@ -27,7 +26,6 @@ def test_risk_scoring():
 
     risk_scorer = get_risk_scorer()
 
-    # Test cases with different risk profiles
     test_cases = [
         {
             'name': 'Invoice_2024.pdf.exe',
@@ -48,7 +46,7 @@ def test_risk_scoring():
         {
             'name': 'encrypted_data.7z',
             'path': 'C:\\Users\\John\\AppData\\Local\\Temp\\encrypted_data.7z',
-            'size': 104857600,  # 100MB
+            'size': 104857600,
             'entropy': 7.9,
             'created': '2025-01-22 16:45:00',
             'modified': '2025-01-22 16:45:00',
@@ -79,10 +77,8 @@ def test_risk_scoring():
         print(f"File: {test_file['name']}")
         print(f"Path: {test_file['path']}")
 
-        # Score the file
         score_result = risk_scorer.score_file(test_file)
 
-        # Display results
         print(f"\n[*] Risk Score: {score_result.score}/100")
         print(f"[!] Severity: {score_result.severity.upper()}")
 
@@ -109,20 +105,17 @@ def test_overwrite_analysis():
     print("\nScenario: A 3.2 GB video file was deleted and partially overwritten")
     print("-" * 70)
 
-    # Simulate a carved file scenario
     carved_file = {
         'carved_id': 'carved_001',
         'file_type': 'mp4',
-        'offset': 1048576 * 100,  # Starts at 100MB
-        'size': 3355443200,  # 3.2 GB
+        'offset': 1048576 * 100,
+        'size': 3355443200,
         'deleted_time': '2025-01-20 10:32:14'
     }
 
-    # Simulate overwrite analysis
-    # (In real usage, this would come from ClusterIndex after parsing the disk)
     analysis = OverwriteAnalysis(
-        total_clusters=819200,  # 3.2GB / 4KB
-        recovered_clusters=90112,  # 11% recovered
+        total_clusters=819200,
+        recovered_clusters=90112,
         recovery_percentage=11.0,
         overwritten_by=[
             ('backup_archive.zip', '2025-01-20 10:33:01', 710000),
@@ -151,7 +144,6 @@ def test_overwrite_analysis():
         summary="Limited recovery: only 11.0% of data intact, heavily overwritten. Primary overwriter: backup_archive.zip"
     )
 
-    # Display analysis
     print(f"\n[*] Recovery Analysis:")
     print(f"   Total clusters: {analysis.total_clusters:,}")
     print(f"   Recovered: {analysis.recovered_clusters:,} ({analysis.recovery_percentage:.1f}%)")
@@ -171,7 +163,6 @@ def test_overwrite_analysis():
     print(f"\n[S] Summary:")
     print(f"   {analysis.summary}")
 
-    # Generate AI narrative (if available)
     print(f"\n[AI] Generating AI narrative...")
     ai_service = get_ai_service()
 
@@ -224,14 +215,12 @@ def test_risk_with_ai_explanation():
     print(f"\nAnalyzing: {suspicious_file['name']}")
     print(f"Location: {suspicious_file['path']}")
 
-    # Get risk score
     print("\n1. Risk Assessment...")
     score_result = risk_scorer.score_file(suspicious_file)
 
     print(f"   Score: {score_result.score}/100 ({score_result.severity.upper()})")
     print(f"   Triggered {len(score_result.reasons)} rule(s)")
 
-    # Get AI explanation of the risk
     if ai_service.is_available():
         print("\n2. Generating AI explanation of risk...")
         explanation = ai_service.explain_risk_score(
@@ -259,16 +248,12 @@ def main():
     print("+" + "=" * 68 + "+")
     print()
 
-    # Test 1: Risk Scoring
     test_risk_scoring()
 
-    # Test 2: Overwrite Analysis
     test_overwrite_analysis()
 
-    # Test 3: Risk + AI Integration
     test_risk_with_ai_explanation()
 
-    # Summary
     print("=" * 70)
     print("Summary")
     print("=" * 70)

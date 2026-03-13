@@ -34,9 +34,6 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 
 
-# ---------------------------------------------------------------------------
-# SOC dark palette constants
-# ---------------------------------------------------------------------------
 _BG = "#1A1A2E"
 _SECTION_BG = "#16213E"
 _ACTIVE_BG = "#0F3460"
@@ -50,9 +47,6 @@ EXPANDED_WIDTH = 200
 COLLAPSED_WIDTH = 60
 
 
-# ===================================================================
-# SidebarButton
-# ===================================================================
 class SidebarButton(QPushButton):
     """Sidebar navigation button with icon, text, and icon-only mode support.
 
@@ -96,7 +90,6 @@ class SidebarButton(QPushButton):
         else:
             self.setToolTip(text)
 
-    # -- public API --------------------------------------------------------
 
     def set_icon_only(self, icon_only: bool) -> None:
         """Toggle between icon-only and icon+text display."""
@@ -114,7 +107,6 @@ class SidebarButton(QPushButton):
         """Return the logical name associated with this button."""
         return self._label_text
 
-    # -- internal ----------------------------------------------------------
 
     def _apply_style(self) -> None:
         bg = _ACTIVE_BG if self._active else "transparent"
@@ -143,9 +135,6 @@ class SidebarButton(QPushButton):
         """)
 
 
-# ===================================================================
-# SidebarSectionHeader
-# ===================================================================
 class SidebarSectionHeader(QWidget):
     """Clickable section header that can collapse/expand its child group.
 
@@ -171,8 +160,7 @@ class SidebarSectionHeader(QWidget):
         layout.setContentsMargins(12, 0, 8, 0)
         layout.setSpacing(4)
 
-        # Small triangle indicator
-        self._arrow_label = QLabel("\u25BE")  # down-pointing triangle
+        self._arrow_label = QLabel("\u25BE")
         self._arrow_label.setFixedWidth(14)
         self._arrow_label.setAlignment(Qt.AlignCenter)
         self._arrow_label.setStyleSheet(
@@ -191,7 +179,6 @@ class SidebarSectionHeader(QWidget):
 
         self.setStyleSheet(f"background-color: {_SECTION_BG}; border: none;")
 
-    # -- public API --------------------------------------------------------
 
     @property
     def expanded(self) -> bool:
@@ -214,7 +201,6 @@ class SidebarSectionHeader(QWidget):
             self.setFixedHeight(28)
             self.setStyleSheet(f"background-color: {_SECTION_BG}; border: none;")
 
-    # -- events ------------------------------------------------------------
 
     def mousePressEvent(self, event) -> None:
         if not self._icon_only:
@@ -224,9 +210,6 @@ class SidebarSectionHeader(QWidget):
         super().mousePressEvent(event)
 
 
-# ===================================================================
-# _SectionGroup  (internal helper)
-# ===================================================================
 class _SectionGroup:
     """Tracks a header and its child buttons so they collapse together."""
 
@@ -240,9 +223,6 @@ class _SectionGroup:
             btn.setVisible(expanded)
 
 
-# ===================================================================
-# SidebarNavigation
-# ===================================================================
 class SidebarNavigation(QWidget):
     """Main collapsible sidebar navigation widget.
 
@@ -277,7 +257,6 @@ class SidebarNavigation(QWidget):
         self._build_ui()
         self._apply_container_style()
 
-    # -- Qt property for width animation -----------------------------------
 
     def _get_sidebar_width(self) -> int:
         return self._current_width
@@ -288,16 +267,12 @@ class SidebarNavigation(QWidget):
 
     sidebarWidth = Property(int, _get_sidebar_width, _set_sidebar_width)
 
-    # ------------------------------------------------------------------
-    # UI construction
-    # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        # --- Toggle / branding button at top ---
         self._toggle_btn = QPushButton()
         self._toggle_btn.setFixedHeight(44)
         self._toggle_btn.setCursor(Qt.PointingHandCursor)
@@ -305,7 +280,6 @@ class SidebarNavigation(QWidget):
         self._update_toggle_button()
         root_layout.addWidget(self._toggle_btn)
 
-        # --- Separator line ---
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         sep.setStyleSheet(
@@ -313,7 +287,6 @@ class SidebarNavigation(QWidget):
         )
         root_layout.addWidget(sep)
 
-        # --- Scrollable area for navigation items ---
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -331,7 +304,6 @@ class SidebarNavigation(QWidget):
         self._nav_layout.setContentsMargins(0, 6, 0, 6)
         self._nav_layout.setSpacing(0)
 
-        # ---------- INGEST ----------
         self._add_section(
             "INGEST",
             [
@@ -341,7 +313,6 @@ class SidebarNavigation(QWidget):
             ],
         )
 
-        # ---------- ANALYZE ----------
         self._add_section(
             "ANALYZE",
             [
@@ -352,7 +323,6 @@ class SidebarNavigation(QWidget):
             ],
         )
 
-        # ---------- CORRELATE ----------
         self._add_section(
             "CORRELATE",
             [
@@ -361,7 +331,6 @@ class SidebarNavigation(QWidget):
             ],
         )
 
-        # ---------- TOOLS ----------
         self._add_section(
             "TOOLS",
             [
@@ -372,7 +341,6 @@ class SidebarNavigation(QWidget):
             ],
         )
 
-        # Bottom spacer to push items to the top
         self._nav_layout.addSpacerItem(
             QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding)
         )
@@ -404,7 +372,6 @@ class SidebarNavigation(QWidget):
             self._buttons[label] = btn
             group.buttons.append(btn)
 
-            # Register keyboard shortcut
             if shortcut_key:
                 shortcut = QShortcut(QKeySequence(shortcut_key), self)
                 shortcut.activated.connect(
@@ -413,9 +380,6 @@ class SidebarNavigation(QWidget):
 
         self._sections.append(group)
 
-    # ------------------------------------------------------------------
-    # Styling helpers
-    # ------------------------------------------------------------------
 
     def _apply_container_style(self) -> None:
         """Apply the self-contained dark style to the sidebar container."""
@@ -426,7 +390,7 @@ class SidebarNavigation(QWidget):
 
     def _update_toggle_button(self) -> None:
         """Refresh the toggle button label and style after collapse state changes."""
-        arrow = "\u276E" if self._expanded else "\u276F"  # chevron left / right
+        arrow = "\u276E" if self._expanded else "\u276F"
         text = f"  {arrow}  ForensAI" if self._expanded else arrow
         align = "left" if self._expanded else "center"
         self._toggle_btn.setText(text)
@@ -446,9 +410,6 @@ class SidebarNavigation(QWidget):
             }}
         """)
 
-    # ------------------------------------------------------------------
-    # Collapse / Expand animation
-    # ------------------------------------------------------------------
 
     def toggle_collapsed(self) -> None:
         """Animate the sidebar between expanded (200 px) and collapsed (60 px)."""
@@ -461,7 +422,6 @@ class SidebarNavigation(QWidget):
         anim.setEndValue(target)
         anim.setEasingCurve(QEasingCurve.InOutCubic)
         anim.finished.connect(self._on_animation_finished)
-        # prevent garbage collection while animation runs
         self._anim = anim
         anim.start()
 
@@ -474,9 +434,6 @@ class SidebarNavigation(QWidget):
             section.header.set_icon_only(icon_only)
         self._update_toggle_button()
 
-    # ------------------------------------------------------------------
-    # Navigation handling
-    # ------------------------------------------------------------------
 
     def _on_button_clicked(self, section_name: str) -> None:
         """Handle a navigation button click or shortcut activation."""
@@ -499,9 +456,6 @@ class SidebarNavigation(QWidget):
             btn.set_active(True)
             self._active_button = btn
 
-    # ------------------------------------------------------------------
-    # Convenience read-only properties
-    # ------------------------------------------------------------------
 
     @property
     def is_expanded(self) -> bool:

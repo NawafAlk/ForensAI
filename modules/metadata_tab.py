@@ -16,14 +16,12 @@ from PySide6.QtGui import QIcon
 import hashlib
 import re
 
-# Try to import magic, but don't fail if it's not available
 try:
     import magic
     MAGIC_AVAILABLE = True
 except (ImportError, OSError):
     MAGIC_AVAILABLE = False
 
-# Import AI service
 try:
     from managers.ai_service import get_ai_service
     from managers.notes_manager import get_notes_manager, Note
@@ -35,8 +33,8 @@ except ImportError:
 class AIExplanationThread(QThread):
     """Background thread for AI explanation generation."""
 
-    finished = Signal(str)  # Emits explanation text
-    error = Signal(str)  # Emits error message
+    finished = Signal(str)
+    error = Signal(str)
 
     def __init__(self, file_data):
         super().__init__()
@@ -56,32 +54,28 @@ class MetadataViewer(QWidget):
     def __init__(self, image_handler):
         super(MetadataViewer, self).__init__()
         self.image_handler = image_handler
-        self.current_file_data = None  # Store current file data for AI
+        self.current_file_data = None
         self.ai_thread = None
         self.init_ui()
 
     def init_ui(self):
-        # Main layout
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
 
-        # Metadata display
         self.metadata_text_edit = QTextEdit()
         self.metadata_text_edit.setReadOnly(True)
         self.metadata_text_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(self.metadata_text_edit)
 
-        # Button layout
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(10, 5, 10, 5)
 
-        # Explain button (only show if AI is available)
         if AI_AVAILABLE:
             self.explain_button = QPushButton("🤖 Explain This Artifact")
             self.explain_button.setToolTip("Use AI to explain the forensic significance of this file")
             self.explain_button.clicked.connect(self.on_explain_clicked)
-            self.explain_button.setEnabled(False)  # Disabled until file is selected
+            self.explain_button.setEnabled(False)
             self.explain_button.setStyleSheet("""
                 QPushButton {
                     background-color: #3498db;
@@ -115,12 +109,6 @@ class MetadataViewer(QWidget):
                 self.explain_button.setEnabled(False)
             return
 
-        # Safe time formatting function
-        # def format_time(timestamp):
-        #     try:
-        #         return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-        #     except (OverflowError, OSError, ValueError):
-        #         return "Invalid timestamp"
         def format_time(timestamp):
             if timestamp is None or timestamp == 0:
                 return "N/A"
@@ -137,7 +125,6 @@ class MetadataViewer(QWidget):
         md5_hash = hashlib.md5(file_content).hexdigest() if file_content else "N/A"
         sha256_hash = hashlib.sha256(file_content).hexdigest() if file_content else "N/A"
 
-        # Use magic if available, otherwise show N/A
         if MAGIC_AVAILABLE and file_content:
             try:
                 mime_type = magic.from_buffer(file_content)
@@ -146,17 +133,15 @@ class MetadataViewer(QWidget):
         else:
             mime_type = "N/A"
 
-        # Ensure size is an integer before passing to get_readable_size
         size = metadata.size if metadata.size else 'N/A'
         if isinstance(size, str):
             try:
-                size = int(size)  # Convert size to int if it's a string
+                size = int(size)
             except ValueError:
-                size = 'N/A'  # Keep as 'N/A' if conversion fails
+                size = 'N/A'
         else:
-            size = self.image_handler.get_readable_size(size)  # Convert size to a readable format
+            size = self.image_handler.get_readable_size(size)
 
-        # extended_metadata = f"<b>Metadata</b>"
         extended_metadata = f"<b style='font-size: 20px; font-family: Courier New;'>Metadata</b>"
         extended_metadata += f"<table style='margin-left: 10px; font-family: Courier New;'>"
         extended_metadata += f"<tr><th style='text-align: left;'>Name:</th><td style='padding-left: 20px;'>{data.get('name', 'N/A')}</td></tr>"
@@ -183,7 +168,6 @@ class MetadataViewer(QWidget):
 
         self.metadata_text_edit.setHtml(extended_metadata)
 
-        # Store file data for AI explanation
         if AI_AVAILABLE:
             self.current_file_data = {
                 'name': data.get('name', 'unknown'),
@@ -208,7 +192,6 @@ class MetadataViewer(QWidget):
             QMessageBox.warning(self, "No File Selected", "Please select a file first.")
             return
 
-        # Check if Groq AI is available
         ai_service = get_ai_service()
         if not ai_service.is_available():
             QMessageBox.warning(
@@ -219,14 +202,12 @@ class MetadataViewer(QWidget):
             )
             return
 
-        # Show progress dialog
         progress = QProgressDialog("Generating AI explanation...", "Cancel", 0, 0, self)
         progress.setWindowModality(Qt.WindowModal)
         progress.setWindowTitle("AI Analysis")
-        progress.setCancelButton(None)  # No cancel button
+        progress.setCancelButton(None)
         progress.show()
 
-        # Start AI thread
         self.ai_thread = AIExplanationThread(self.current_file_data)
         self.ai_thread.finished.connect(lambda explanation: self.show_explanation_dialog(explanation, progress))
         self.ai_thread.error.connect(lambda error: self.show_error_dialog(error, progress))
@@ -236,7 +217,6 @@ class MetadataViewer(QWidget):
         """Show AI explanation in a dialog with save option."""
         progress.close()
 
-        # Create dialog
         dialog = QDialog(self)
         dialog.setWindowTitle("AI Forensic Explanation")
         dialog.setMinimumWidth(600)
@@ -244,15 +224,13 @@ class MetadataViewer(QWidget):
 
         layout = QVBoxLayout(dialog)
 
-        # Title
         title_label = QLabel(f"<b>Artifact:</b> {self.current_file_data['name']}")
         title_label.setStyleSheet("font-size: 12pt; padding: 10px;")
         layout.addWidget(title_label)
 
-        # Explanation text
         explanation_text = QTextEdit()
         explanation_text.setPlainText(explanation)
-        explanation_text.setReadOnly(False)  # Allow editing before saving
+        explanation_text.setReadOnly(False)
         explanation_text.setStyleSheet("""
             QTextEdit {
                 border: 1px solid #bdc3c7;
@@ -264,12 +242,10 @@ class MetadataViewer(QWidget):
         """)
         layout.addWidget(explanation_text)
 
-        # Info label
         info_label = QLabel("💡 You can edit this explanation before saving it as a note.")
         info_label.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 5px;")
         layout.addWidget(info_label)
 
-        # Buttons
         button_box = QDialogButtonBox()
 
         save_button = button_box.addButton("Save as Note", QDialogButtonBox.AcceptRole)
@@ -303,7 +279,6 @@ class MetadataViewer(QWidget):
         try:
             notes_manager = get_notes_manager()
 
-            # Create artifact ID from inode + offset
             artifact_id = f"{self.current_file_data['inode']}@{self.current_file_data['offset']}"
 
             note = Note(
@@ -312,7 +287,7 @@ class MetadataViewer(QWidget):
                 artifact_name=self.current_file_data['name'],
                 content=explanation,
                 ai_generated=True,
-                edited=True  # User can edit before saving
+                edited=True
             )
 
             notes_manager.add_note(note)

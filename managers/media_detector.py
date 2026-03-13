@@ -21,35 +21,29 @@ from datetime import datetime
 class MediaInfo:
     """Complete media information for forensic reporting."""
 
-    # Media type
-    media_type: str = "Unknown"  # 'SSD', 'HDD', 'Flash', 'Optical', 'Network', 'Unknown'
-    media_subtype: str = ""  # 'NVMe', 'SATA', 'USB', etc.
+    media_type: str = "Unknown"
+    media_subtype: str = ""
 
-    # TRIM/DEALLOCATE detection
     trim_enabled: bool = False
     trim_evidence_found: bool = False
-    trim_confidence: float = 0.0  # 0.0-1.0
+    trim_confidence: float = 0.0
 
-    # Capacity and geometry
     total_size_bytes: int = 0
     sector_size: int = 512
     total_sectors: int = 0
 
-    # Acquisition metadata
     acquisition_tool: str = ""
     acquisition_date: str = ""
-    acquisition_mode: str = ""  # 'Physical', 'Logical', 'Live'
+    acquisition_mode: str = ""
     acquisition_hash_verified: bool = False
     is_read_only: bool = True
 
-    # EWF-specific metadata
     ewf_case_number: str = ""
     ewf_evidence_number: str = ""
     ewf_examiner_name: str = ""
     ewf_description: str = ""
     ewf_notes: str = ""
 
-    # Media health indicators
     bad_sectors_detected: int = 0
     warning_flags: List[str] = None
 
@@ -65,10 +59,9 @@ class MediaDetector:
     Critical for determining recovery probability on SSDs with TRIM.
     """
 
-    # TRIM detection thresholds
-    TRIM_PATTERN_MIN_SIZE = 64 * 1024  # 64KB contiguous zeros/0xFF
-    TRIM_SAMPLE_SIZE = 10 * 1024 * 1024  # Sample 10MB from various locations
-    TRIM_CONFIDENCE_THRESHOLD = 0.7  # 70% confidence to report TRIM
+    TRIM_PATTERN_MIN_SIZE = 64 * 1024
+    TRIM_SAMPLE_SIZE = 10 * 1024 * 1024
+    TRIM_CONFIDENCE_THRESHOLD = 0.7
 
     def __init__(self, image_handler):
         """
@@ -89,25 +82,20 @@ class MediaDetector:
         """
         info = MediaInfo()
 
-        # Get basic size information
         info.total_size_bytes = self.image_handler.get_size()
         info.total_sectors = info.total_size_bytes // info.sector_size
 
-        # Extract EWF metadata if available
         if self.image_handler.get_image_type() == "ewf":
             self._extract_ewf_metadata(info)
 
-        # Detect media type
         info.media_type, info.media_subtype = self._detect_media_type(info)
 
-        # Detect TRIM if SSD
         if info.media_type in ['SSD', 'Flash']:
             trim_result = self._detect_trim_patterns()
             info.trim_evidence_found = trim_result['found']
             info.trim_confidence = trim_result['confidence']
             info.trim_enabled = trim_result['confidence'] > self.TRIM_CONFIDENCE_THRESHOLD
 
-        # Add warnings based on findings
         self._generate_warnings(info)
 
         self.media_info = info
@@ -125,7 +113,6 @@ class MediaDetector:
             ewf_handle = pyewf.handle()
             ewf_handle.open(filenames)
 
-            # Extract header values
             try:
                 info.ewf_case_number = ewf_handle.get_header_value("case_number") or ""
             except:
@@ -161,16 +148,14 @@ class MediaDetector:
             except:
                 pass
 
-            # Check hash verification
             try:
                 stored_md5 = ewf_handle.get_hash_value("MD5")
                 info.acquisition_hash_verified = bool(stored_md5)
             except:
                 info.acquisition_hash_verified = False
 
-            # EWF images are always read-only
             info.is_read_only = True
-            info.acquisition_mode = "Physical"  # EWF implies physical acquisition
+            info.acquisition_mode = "Physical"
 
             ewf_handle.close()
 
@@ -187,11 +172,9 @@ class MediaDetector:
         Returns:
             Tuple of (media_type, media_subtype)
         """
-        # Default assumptions
         media_type = "Unknown"
         media_subtype = ""
 
-        # Check EWF metadata for hints
         if info.ewf_description:
             desc_lower = info.ewf_description.lower()
 
@@ -209,19 +192,16 @@ class MediaDetector:
             elif 'cd' in desc_lower or 'dvd' in desc_lower or 'optical' in desc_lower:
                 media_type = "Optical"
 
-        # Heuristic: check size ranges
         size_gb = info.total_size_bytes / (1024**3)
 
         if media_type == "Unknown":
             if size_gb < 2:
-                media_type = "Flash"  # Small drives often USB
+                media_type = "Flash"
                 media_subtype = "USB"
             elif size_gb < 128:
-                # Could be either, but small capacities often SSD
                 media_type = "SSD"
                 media_subtype = "SATA"
             else:
-                # Large capacity, likely HDD unless proven otherwise
                 media_type = "HDD"
                 media_subtype = "SATA"
 
@@ -247,20 +227,18 @@ class MediaDetector:
         try:
             total_size = self.image_handler.get_size()
 
-            # Sample multiple locations across the disk
             sample_locations = [
-                int(total_size * 0.1),   # 10%
-                int(total_size * 0.3),   # 30%
-                int(total_size * 0.5),   # 50%
-                int(total_size * 0.7),   # 70%
-                int(total_size * 0.9),   # 90%
+                int(total_size * 0.1),
+                int(total_size * 0.3),
+                int(total_size * 0.5),
+                int(total_size * 0.7),
+                int(total_size * 0.9),
             ]
 
             trim_indicators = 0
             total_samples = 0
 
             for offset in sample_locations:
-                # Read sample
                 sample_data = self.image_handler.read(offset, self.TRIM_SAMPLE_SIZE)
 
                 if not sample_data:
@@ -268,15 +246,13 @@ class MediaDetector:
 
                 total_samples += 1
 
-                # Check for large contiguous zero or 0xFF blocks
                 if self._has_trim_pattern(sample_data):
                     trim_indicators += 1
                     result['patterns_found'].append(f"Offset {offset}: TRIM pattern detected")
 
-            # Calculate confidence
             if total_samples > 0:
                 result['confidence'] = trim_indicators / total_samples
-                result['found'] = result['confidence'] > 0.3  # Found in >30% of samples
+                result['found'] = result['confidence'] > 0.3
 
             result['details'] = {
                 'samples_checked': total_samples,
@@ -308,30 +284,25 @@ class MediaDetector:
         if len(data) < self.TRIM_PATTERN_MIN_SIZE:
             return False
 
-        # Check for contiguous zeros
         max_zero_run = 0
         current_zero_run = 0
 
-        # Check for contiguous 0xFF
         max_ff_run = 0
         current_ff_run = 0
 
         for byte in data:
-            # Track zero runs
             if byte == 0x00:
                 current_zero_run += 1
                 max_zero_run = max(max_zero_run, current_zero_run)
             else:
                 current_zero_run = 0
 
-            # Track 0xFF runs
             if byte == 0xFF:
                 current_ff_run += 1
                 max_ff_run = max(max_ff_run, current_ff_run)
             else:
                 current_ff_run = 0
 
-        # If we find a large contiguous run, likely TRIM
         return (max_zero_run >= self.TRIM_PATTERN_MIN_SIZE or
                 max_ff_run >= self.TRIM_PATTERN_MIN_SIZE)
 
@@ -342,27 +313,23 @@ class MediaDetector:
         Args:
             info: MediaInfo to add warnings to
         """
-        # TRIM warning (critical for recovery)
         if info.trim_enabled or info.trim_evidence_found:
             info.warning_flags.append(
                 f"CRITICAL: TRIM detected (confidence: {info.trim_confidence*100:.1f}%). "
                 "Deleted file recovery probability is LOW."
             )
 
-        # SSD warning (even without TRIM)
         if info.media_type == "SSD" and not info.trim_evidence_found:
             info.warning_flags.append(
                 "WARNING: SSD detected. If TRIM is enabled in the OS, "
                 "deleted data may be unrecoverable."
             )
 
-        # Hash verification warning
         if info.acquisition_mode and not info.acquisition_hash_verified:
             info.warning_flags.append(
                 "WARNING: Acquisition hash not verified. Image integrity uncertain."
             )
 
-        # Size warning (USB drives often have bad forensic value)
         size_gb = info.total_size_bytes / (1024**3)
         if info.media_type == "Flash" and size_gb < 8:
             info.warning_flags.append(
@@ -381,7 +348,6 @@ class MediaDetector:
 
         report = asdict(self.media_info)
 
-        # Add human-readable summary
         report['summary'] = self._generate_summary()
 
         return report

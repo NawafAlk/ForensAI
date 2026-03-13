@@ -22,13 +22,10 @@ from PySide6.QtWidgets import (
 )
 
 
-# Helper Function to List Drives (For Physical and Logical Drive Selection)
 def list_drives():
     if os.name == "nt":
-        # Using PowerShell command to list drives on Windows
         command = ["powershell", "-NoProfile", "Get-WmiObject Win32_DiskDrive | Select-Object Model, DeviceID"]
     elif os.name == "darwin":
-        # Using diskutil to list drives on macOS
         command = ["diskutil", "list"]
     else:
         raise Exception("Unsupported OS")
@@ -44,7 +41,6 @@ class Main(QMainWindow):
         super().__init__()
         self.setWindowTitle("Convert E01 to DD/RAW")
         self.setGeometry(100, 100, 400, 400)
-        # set logo
         self.setWindowIcon(QIcon('Icons/logo.ico'))
 
         self.stacked_widget = QStackedWidget()
@@ -69,20 +65,17 @@ class Main(QMainWindow):
         if widget_name == "conversion":
             self.stacked_widget.setCurrentWidget(self.conversion_widget)
         elif widget_name == "folder_contents":
-            # Handle folder contents selection
-            pass  # Placeholder for actual implementation
+            pass
         elif widget_name == "physical_drive":
             self.stacked_widget.setCurrentWidget(self.drive_selection_widget)
 
         elif widget_name == "logical_drive":
-            # Handle logical drive selection
-            pass  # Placeholder for actual implementation
+            pass
 
     def show_select_source(self):
         self.stacked_widget.setCurrentWidget(self.select_source_dialog)
 
 
-# New Widget for Drive Selection
 class DriveSelectionWidget(QWidget):
     backRequested = Signal()
     driveSelected = Signal(str)
@@ -114,7 +107,7 @@ class DriveSelectionWidget(QWidget):
 
     def on_select_clicked(self):
         selected_drive = self.drive_combo.currentText()
-        self.driveSelected.emit(selected_drive.split()[-1])  # Assuming the device ID is the last part
+        self.driveSelected.emit(selected_drive.split()[-1])
 
 
 class SelectSourceDialog(QWidget):
@@ -128,14 +121,11 @@ class SelectSourceDialog(QWidget):
         self.layout.addWidget(self.group_box)
 
         self.radio_buttons_layout = QVBoxLayout()
-        # Existing options
         self.image_file_radio = QRadioButton("Image File")
-        # New source options
         self.physical_drive_radio = QRadioButton("Physical Drive (not implemented)")
         self.logical_drive_radio = QRadioButton("Logical Drive (not implemented)")
         self.contents_of_folder_radio = QRadioButton("Contents of a Folder (not implemented)")
 
-        # Add the radio buttons to the layout
         self.radio_buttons_layout.addWidget(self.image_file_radio)
         self.radio_buttons_layout.addWidget(self.physical_drive_radio)
         self.radio_buttons_layout.addWidget(self.logical_drive_radio)
@@ -162,7 +152,7 @@ class SelectSourceDialog(QWidget):
 
 
 class ConversionWidget(QWidget):
-    backRequested = Signal()  # Signal to request going back to the source selection
+    backRequested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -194,7 +184,6 @@ class ConversionWidget(QWidget):
 
         layout.addLayout(form_layout)
 
-        # Buttons layout
         buttons_layout = QHBoxLayout()
         back_button = QPushButton("Back")
         back_button.clicked.connect(self.on_back_clicked)
@@ -223,7 +212,7 @@ class ConversionWidget(QWidget):
 
     def convert(self):
         input_path = self.input_line_edit.text()
-        output_format = self.format_combo_box.currentText().lower()  # 'dd' or 'raw'
+        output_format = self.format_combo_box.currentText().lower()
         output_dir = self.output_line_edit.text()
 
         if not input_path or not os.path.isfile(input_path):

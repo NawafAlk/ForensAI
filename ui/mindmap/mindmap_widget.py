@@ -50,18 +50,12 @@ from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtSvg import QSvgGenerator
 
 
-# ============================================================================
-# Constants and Configuration
-# ============================================================================
+CLUSTER_THRESHOLD = 25
+LOD_THRESHOLD = 200
+LOD_ZOOM_THRESHOLD = 0.5
+MAX_NODES_GUARD = 10000
+BATCH_EMIT_SIZE = 50
 
-# Performance and behavior settings
-CLUSTER_THRESHOLD = 25  # Show cluster node if children > this
-LOD_THRESHOLD = 200  # Enable LOD rendering if total nodes > this
-LOD_ZOOM_THRESHOLD = 0.5  # Show full detail when zoom >= this
-MAX_NODES_GUARD = 10000  # Safety limit for node generation
-BATCH_EMIT_SIZE = 50  # Emit nodes in batches of this size
-
-# Layout settings (will be instance variables but defaults here)
 DEFAULT_LAYOUT_SPACING = 200
 DEFAULT_LEVEL_SPACING = 100
 
@@ -70,7 +64,7 @@ class NodeType(Enum):
     DIRECTORY = "directory"
     FILE = "file"
     ROOT = "root"
-    CLUSTER = "cluster"  # For +N more nodes
+    CLUSTER = "cluster"
 
 
 class FileTypeCategory(Enum):
@@ -86,38 +80,30 @@ class FileTypeCategory(Enum):
     UNKNOWN = "unknown"
 
 
-# Color scheme for different file types
 FILE_TYPE_COLORS = {
-    FileTypeCategory.DOCUMENT: QColor(100, 150, 255),  # Blue
-    FileTypeCategory.IMAGE: QColor(255, 150, 100),      # Orange
-    FileTypeCategory.VIDEO: QColor(200, 100, 255),      # Purple
-    FileTypeCategory.AUDIO: QColor(100, 255, 150),      # Green
-    FileTypeCategory.ARCHIVE: QColor(255, 200, 100),    # Yellow
-    FileTypeCategory.EXECUTABLE: QColor(255, 100, 100), # Red
-    FileTypeCategory.CODE: QColor(150, 255, 150),       # Light green
-    FileTypeCategory.DATA: QColor(180, 180, 180),       # Gray
-    FileTypeCategory.UNKNOWN: QColor(200, 200, 200),    # Light gray
+    FileTypeCategory.DOCUMENT: QColor(100, 150, 255),
+    FileTypeCategory.IMAGE: QColor(255, 150, 100),
+    FileTypeCategory.VIDEO: QColor(200, 100, 255),
+    FileTypeCategory.AUDIO: QColor(100, 255, 150),
+    FileTypeCategory.ARCHIVE: QColor(255, 200, 100),
+    FileTypeCategory.EXECUTABLE: QColor(255, 100, 100),
+    FileTypeCategory.CODE: QColor(150, 255, 150),
+    FileTypeCategory.DATA: QColor(180, 180, 180),
+    FileTypeCategory.UNKNOWN: QColor(200, 200, 200),
 }
 
-# Directory color
 DIRECTORY_COLOR = QColor(100, 200, 255)
 ROOT_COLOR = QColor(255, 180, 50)
-CLUSTER_COLOR = QColor(150, 150, 150)  # Gray for cluster nodes
+CLUSTER_COLOR = QColor(150, 150, 150)
 
-# Node sizes
 NODE_SIZE_SMALL = 20
 NODE_SIZE_MEDIUM = 30
 NODE_SIZE_LARGE = 40
 
-# Layout constants
 NODE_SPACING = 100
 LEVEL_SPACING = 150
-ANGLE_SPREAD = 360  # degrees for radial layout
+ANGLE_SPREAD = 360
 
-
-# ============================================================================
-# ClusterNode - Represents Collapsed Children
-# ============================================================================
 
 class ClusterNode(QGraphicsEllipseItem):
     """
@@ -126,7 +112,7 @@ class ClusterNode(QGraphicsEllipseItem):
     Double-click to expand and load actual children.
     """
 
-    expand_requested = Signal()  # Signal when expansion requested
+    expand_requested = Signal()
 
     def __init__(self, count: int, parent_node: 'FileNode' = None):
         """
@@ -145,11 +131,9 @@ class ClusterNode(QGraphicsEllipseItem):
         self.level = parent_node.level + 1 if parent_node else 0
         self.children = []
 
-        # Visual properties
         self.setBrush(QBrush(CLUSTER_COLOR))
         self.setPen(QPen(CLUSTER_COLOR.darker(120), 2))
 
-        # Text label
         self.label = QGraphicsTextItem(f"+{count} more", self)
         self.label.setDefaultTextColor(Qt.white)
         self.label.setFont(QFont("Arial", 7, QFont.Bold))
@@ -159,7 +143,6 @@ class ClusterNode(QGraphicsEllipseItem):
             radius + 5
         )
 
-        # Enable interactions
         self.setFlags(QGraphicsEllipseItem.ItemIsSelectable)
         self.setAcceptHoverEvents(True)
         self.setToolTip(f"Double-click to expand {count} children")
@@ -181,10 +164,6 @@ class ClusterNode(QGraphicsEllipseItem):
         super().hoverLeaveEvent(event)
 
 
-# ============================================================================
-# FileNode - Visual Node Representation
-# ============================================================================
-
 class FileNode(QGraphicsEllipseItem):
     """
     Represents a file or directory node in the mind map.
@@ -197,7 +176,6 @@ class FileNode(QGraphicsEllipseItem):
     - Context menu with actions
     """
 
-    # Signals for context menu actions
     copy_path_requested = Signal(str)
     export_requested = Signal(str)
     focus_requested = Signal(object)
@@ -222,7 +200,6 @@ class FileNode(QGraphicsEllipseItem):
             inode: Inode number
             parent_node: Parent FileNode
         """
-        # Determine node size based on type
         if node_type == NodeType.ROOT:
             radius = NODE_SIZE_LARGE
         elif node_type == NodeType.DIRECTORY:
@@ -232,7 +209,6 @@ class FileNode(QGraphicsEllipseItem):
 
         super().__init__(-radius, -radius, radius * 2, radius * 2)
 
-        # Node metadata
         self.name = name
         self.node_type = node_type
         self.size = size
@@ -240,30 +216,25 @@ class FileNode(QGraphicsEllipseItem):
         self.inode = inode
         self.parent_node = parent_node
         self.children: List['FileNode'] = []
-        self.is_expanded = True  # Start expanded
-        self.is_loaded = False  # For lazy loading
-        self.level = 0  # Hierarchy level (set properly during layout)
+        self.is_expanded = True
+        self.is_loaded = False
+        self.level = 0
 
-        # Cluster support
         self.cluster_node: Optional['ClusterNode'] = None
-        self.collapsed_children: List['FileNode'] = []  # Hidden children
-        self.pending_child_count = 0  # Children not yet loaded
+        self.collapsed_children: List['FileNode'] = []
+        self.pending_child_count = 0
 
-        # Visual properties
         self._setup_appearance()
 
-        # Text label
         self.label = QGraphicsTextItem(self._get_display_name(), self)
         self.label.setDefaultTextColor(Qt.black)
         self.label.setFont(QFont("Arial", 8))
         self._position_label()
 
-        # Connection line to parent
         self.connection_line: Optional[QGraphicsLineItem] = None
         if parent_node:
             self._create_connection_line()
 
-        # Enable interactions
         self.setFlags(
             QGraphicsEllipseItem.ItemIsSelectable |
             QGraphicsEllipseItem.ItemSendsGeometryChanges
@@ -271,15 +242,12 @@ class FileNode(QGraphicsEllipseItem):
         self.setAcceptHoverEvents(True)
         self.setCacheMode(QGraphicsEllipseItem.ItemCoordinateCache)
 
-        # Tooltip
         self.setToolTip(self._create_tooltip())
 
-        # LOD support
-        self.detail_level = "full"  # "full" or "simple"
+        self.detail_level = "full"
 
-        # Filter support
-        self.is_filtered = False  # True if node doesn't match current filter
-        self.original_opacity = 1.0  # Store original opacity for restore
+        self.is_filtered = False
+        self.original_opacity = 1.0
 
     def set_detail_level(self, level: str):
         """Set rendering detail level for LOD"""
@@ -289,11 +257,9 @@ class FileNode(QGraphicsEllipseItem):
         self.detail_level = level
 
         if level == "simple":
-            # Hide label for simplified rendering
             if self.label:
                 self.label.setVisible(False)
         else:
-            # Show label for full rendering
             if self.label:
                 self.label.setVisible(True)
 
@@ -309,19 +275,16 @@ class FileNode(QGraphicsEllipseItem):
 
         if filtered:
             if hide_mode:
-                # Completely hide the node
                 self.setVisible(False)
                 if self.label:
                     self.label.setVisible(False)
                 if self.connection_line:
                     self.connection_line.setVisible(False)
             else:
-                # Dim the node (semi-transparent)
                 self.setOpacity(0.2)
                 if self.label:
                     self.label.setOpacity(0.2)
         else:
-            # Restore normal visibility
             self.setVisible(True)
             self.setOpacity(self.original_opacity)
             if self.label and self.detail_level == "full":
@@ -332,7 +295,6 @@ class FileNode(QGraphicsEllipseItem):
 
     def _setup_appearance(self):
         """Setup visual appearance based on node type"""
-        # Choose color
         if self.node_type == NodeType.ROOT:
             color = ROOT_COLOR
         elif self.node_type == NodeType.DIRECTORY:
@@ -340,7 +302,6 @@ class FileNode(QGraphicsEllipseItem):
         else:
             color = FILE_TYPE_COLORS.get(self.file_category, FILE_TYPE_COLORS[FileTypeCategory.UNKNOWN])
 
-        # Set brush and pen
         self.setBrush(QBrush(color))
         self.setPen(QPen(color.darker(120), 2))
 
@@ -353,7 +314,6 @@ class FileNode(QGraphicsEllipseItem):
         - RTL text detection
         - Truncation for long names
         """
-        # Normalize Unicode (NFC form - canonical composition)
         normalized_name = unicodedata.normalize('NFC', self.name)
 
         max_length = 15
@@ -374,15 +334,13 @@ class FileNode(QGraphicsEllipseItem):
         for char in text:
             if char.isalpha():
                 total_chars += 1
-                # Check if character is RTL
                 bidi_type = unicodedata.bidirectional(char)
-                if bidi_type in ('R', 'AL', 'RLE', 'RLO'):  # RTL types
+                if bidi_type in ('R', 'AL', 'RLE', 'RLO'):
                     rtl_chars += 1
 
         if total_chars == 0:
             return False
 
-        # If more than 50% RTL characters, treat as RTL
         return (rtl_chars / total_chars) > 0.5
 
     def _position_label(self):
@@ -394,16 +352,13 @@ class FileNode(QGraphicsEllipseItem):
         rect = self.rect()
         label_rect = self.label.boundingRect()
 
-        # Check if text is RTL
         is_rtl = self._is_rtl_text(self.name)
 
         if is_rtl:
-            # For RTL text, set text direction
             text_option = self.label.document().defaultTextOption()
             text_option.setTextDirection(Qt.RightToLeft)
             self.label.document().setDefaultTextOption(text_option)
 
-        # Center label below node (same positioning for both LTR and RTL)
         self.label.setPos(
             rect.center().x() - label_rect.width() / 2,
             rect.bottom() + 5
@@ -414,44 +369,37 @@ class FileNode(QGraphicsEllipseItem):
         if not self.parent_node:
             return
 
-        # Use QGraphicsPathItem for curved lines
         self.connection_line = QGraphicsPathItem()
 
-        # Calculate alpha based on depth (deeper = more transparent)
-        alpha = max(50, 255 - (self.level * 25))  # Fade with depth
+        alpha = max(50, 255 - (self.level * 25))
         color = QColor(150, 150, 150, alpha)
 
         self.connection_line.setPen(QPen(color, 1.5))
-        self.connection_line.setZValue(-1)  # Behind nodes
+        self.connection_line.setZValue(-1)
 
     def update_connection_line(self):
         """Update curved connection line position"""
         if not self.connection_line or not self.parent_node:
             return
 
-        # Get positions - connect center of parent to center of child
         start = self.parent_node.scenePos()
         end = self.scenePos()
 
-        # Create curved path using cubic B\u00e9zier curve
         path = QPainterPath()
         path.moveTo(start)
 
-        # Calculate control points for smooth curve
         dx = end.x() - start.x()
         dy = end.y() - start.y()
 
-        # Control points create an S-curve
         ctrl1_x = start.x() + dx * 0.5
         ctrl1_y = start.y()
         ctrl2_x = start.x() + dx * 0.5
         ctrl2_y = end.y()
 
-        # Draw cubic bezier curve
         path.cubicTo(
-            ctrl1_x, ctrl1_y,  # First control point
-            ctrl2_x, ctrl2_y,  # Second control point
-            end.x(), end.y()   # End point
+            ctrl1_x, ctrl1_y,
+            ctrl2_x, ctrl2_y,
+            end.x(), end.y()
         )
 
         self.connection_line.setPath(path)
@@ -478,13 +426,11 @@ class FileNode(QGraphicsEllipseItem):
 
     def hoverEnterEvent(self, event):
         """Handle mouse hover enter"""
-        # Highlight on hover
         self.setPen(QPen(QColor(255, 200, 0), 3))
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
         """Handle mouse hover leave"""
-        # Remove highlight
         color = self.brush().color()
         self.setPen(QPen(color.darker(120), 2))
         super().hoverLeaveEvent(event)
@@ -499,7 +445,6 @@ class FileNode(QGraphicsEllipseItem):
         """Show context menu on right-click"""
         menu = QMenu()
 
-        # Get full path
         path_parts = []
         node = self
         while node:
@@ -508,12 +453,10 @@ class FileNode(QGraphicsEllipseItem):
             node = node.parent_node
         full_path = "/" + "/".join(path_parts) if path_parts else "/"
 
-        # Copy Path action
         copy_action = QAction("Copy Path", menu)
         copy_action.triggered.connect(lambda: self._copy_to_clipboard(full_path))
         menu.addAction(copy_action)
 
-        # Export File action (for files only)
         if self.node_type == NodeType.FILE:
             export_action = QAction("Export File...", menu)
             export_action.triggered.connect(lambda: self._request_export(full_path))
@@ -521,19 +464,16 @@ class FileNode(QGraphicsEllipseItem):
 
         menu.addSeparator()
 
-        # Focus/Center action
         focus_action = QAction("Focus on This Node", menu)
         focus_action.triggered.connect(lambda: self._request_focus())
         menu.addAction(focus_action)
 
-        # Toggle Expand/Collapse (for directories)
         if self.node_type == NodeType.DIRECTORY:
             toggle_text = "Collapse" if self.is_expanded else "Expand"
             toggle_action = QAction(toggle_text, menu)
             toggle_action.triggered.connect(self.toggle_collapse)
             menu.addAction(toggle_action)
 
-        # Show menu at cursor position
         menu.exec_(event.screenPos())
 
     def _copy_to_clipboard(self, path: str):
@@ -543,7 +483,6 @@ class FileNode(QGraphicsEllipseItem):
 
     def _request_export(self, path: str):
         """Request file export (emits signal)"""
-        # Signal would be connected in MindMapWidget
         pass
 
     def _request_focus(self):
@@ -551,7 +490,7 @@ class FileNode(QGraphicsEllipseItem):
         if self.scene() and self.scene().views():
             view = self.scene().views()[0]
             view.centerOn(self)
-            view.scale(1.5, 1.5)  # Zoom in slightly
+            view.scale(1.5, 1.5)
 
     def add_child(self, child: 'FileNode'):
         """Add a child node"""
@@ -578,16 +517,12 @@ class FileNode(QGraphicsEllipseItem):
         self.is_expanded = False
 
         if animated:
-            # Animated collapse with fade-out
             self._animate_collapse()
         else:
-            # Instant collapse (no animation)
             self._collapse_instant()
 
-        # Store collapsed children
         self.collapsed_children = self.children.copy()
 
-        # Remove cluster node if exists
         if self.cluster_node and self.cluster_node.scene():
             self.cluster_node.scene().removeItem(self.cluster_node)
             if self.cluster_node.label and self.cluster_node.label.scene():
@@ -611,23 +546,19 @@ class FileNode(QGraphicsEllipseItem):
 
     def _animate_collapse(self):
         """Animate collapse with fade-out effect"""
-        # Collect all nodes to animate
         nodes_to_hide = []
 
         def collect_recursive(node, delay_ms=0):
             nodes_to_hide.append((node, delay_ms))
             for i, child in enumerate(node.children):
-                # Stagger child animations
                 collect_recursive(child, delay_ms + 30)
 
         for i, child in enumerate(self.children):
             collect_recursive(child, i * 30)
 
-        # Create animation group
         anim_group = QParallelAnimationGroup(self)
 
         for node, delay in nodes_to_hide:
-            # Fade out animation
             anim = QPropertyAnimation(node, b"opacity")
             anim.setDuration(200)
             anim.setStartValue(node.opacity())
@@ -637,7 +568,6 @@ class FileNode(QGraphicsEllipseItem):
                 QTimer.singleShot(delay, anim.start)
             anim_group.addAnimation(anim)
 
-        # Remove nodes after animation completes
         anim_group.finished.connect(lambda: self._collapse_instant())
         anim_group.start()
 
@@ -653,7 +583,6 @@ class FileNode(QGraphicsEllipseItem):
 
         self.is_expanded = True
 
-        # Restore children to scene first
         def show_recursive(node):
             if not node.scene() and self.scene():
                 self.scene().addItem(node)
@@ -661,7 +590,6 @@ class FileNode(QGraphicsEllipseItem):
                 self.scene().addItem(node.label)
             if node.connection_line and not node.connection_line.scene() and self.scene():
                 self.scene().addItem(node.connection_line)
-            # Only show children if parent is expanded
             if node.is_expanded:
                 for child in node.children:
                     show_recursive(child)
@@ -670,12 +598,10 @@ class FileNode(QGraphicsEllipseItem):
             show_recursive(child)
 
         if animated:
-            # Animate fade-in
             self._animate_expand()
 
         self.collapsed_children = []
 
-        # Trigger layout update if possible
         if self.scene() and hasattr(self.scene(), 'views'):
             views = self.scene().views()
             if views and hasattr(views[0].parent(), '_layout_nodes'):
@@ -683,7 +609,6 @@ class FileNode(QGraphicsEllipseItem):
 
     def _animate_expand(self):
         """Animate expand with fade-in effect"""
-        # Collect all visible nodes to animate
         nodes_to_show = []
 
         def collect_recursive(node, delay_ms=0):
@@ -695,12 +620,9 @@ class FileNode(QGraphicsEllipseItem):
         for i, child in enumerate(self.collapsed_children):
             collect_recursive(child, i * 30)
 
-        # Create animations
         for node, delay in nodes_to_show:
-            # Start with opacity 0
             node.setOpacity(0.0)
 
-            # Fade in animation
             anim = QPropertyAnimation(node, b"opacity")
             anim.setDuration(250)
             anim.setStartValue(0.0)
@@ -717,20 +639,14 @@ class FileNode(QGraphicsEllipseItem):
         if not self.cluster_node:
             return
 
-        # Remove cluster node
         if self.cluster_node.scene():
             self.cluster_node.scene().removeItem(self.cluster_node)
         if self.cluster_node.label and self.cluster_node.label.scene():
             self.cluster_node.label.scene().removeItem(self.cluster_node.label)
         self.cluster_node = None
 
-        # Show children (they should already exist, just hidden)
         self.expand()
 
-
-# ============================================================================
-# MindMapView - Interactive Graphics View
-# ============================================================================
 
 class MindMapView(QGraphicsView):
     """
@@ -743,7 +659,7 @@ class MindMapView(QGraphicsView):
     - Keyboard navigation
     """
 
-    node_selected = Signal(object)  # Emits FileNode when selected
+    node_selected = Signal(object)
 
     def __init__(self, parent=None):
         """Initialize the view"""
@@ -752,7 +668,6 @@ class MindMapView(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
-        # View settings
         self.setRenderHint(QPainter.Antialiasing)
         self.setRenderHint(QPainter.SmoothPixmapTransform)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -761,25 +676,20 @@ class MindMapView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
-        # Pan/zoom state
         self._isPanning = False
         self._lastPanPoint = QPointF()
         self._zoom_factor = 1.0
         self._min_zoom = 0.1
         self._max_zoom = 5.0
 
-        # Background
         self.setBackgroundBrush(QBrush(QColor(250, 250, 250)))
 
     def wheelEvent(self, event: QWheelEvent):
         """Handle mouse wheel for zooming"""
-        # Only zoom with Ctrl key
         if event.modifiers() & Qt.ControlModifier:
-            # Zoom factor
             zoom_in_factor = 1.15
             zoom_out_factor = 1 / zoom_in_factor
 
-            # Calculate zoom
             if event.angleDelta().y() > 0:
                 zoom_factor = zoom_in_factor
                 self._zoom_factor *= zoom_factor
@@ -787,7 +697,6 @@ class MindMapView(QGraphicsView):
                 zoom_factor = zoom_out_factor
                 self._zoom_factor *= zoom_factor
 
-            # Apply zoom limits
             if self._zoom_factor < self._min_zoom:
                 self._zoom_factor = self._min_zoom
                 return
@@ -795,26 +704,20 @@ class MindMapView(QGraphicsView):
                 self._zoom_factor = self._max_zoom
                 return
 
-            # Apply zoom
             self.scale(zoom_factor, zoom_factor)
 
-            # Update LOD based on zoom level
             self._update_lod()
         else:
-            # Normal scroll
             super().wheelEvent(event)
 
     def _update_lod(self):
         """Update Level-of-Detail based on current zoom"""
-        # Check if LOD should be applied
         total_nodes = len(self.scene.items())
         if total_nodes < LOD_THRESHOLD:
-            return  # Not enough nodes to need LOD
+            return
 
-        # Determine detail level based on zoom
         detail_level = "full" if self._zoom_factor >= LOD_ZOOM_THRESHOLD else "simple"
 
-        # Update all FileNode items
         for item in self.scene.items():
             if isinstance(item, FileNode):
                 item.set_detail_level(detail_level)
@@ -822,7 +725,6 @@ class MindMapView(QGraphicsView):
     def mousePressEvent(self, event: QMouseEvent):
         """Handle mouse press"""
         if event.button() == Qt.MiddleButton:
-            # Start panning with middle button
             self._isPanning = True
             self._lastPanPoint = event.pos()
             self.setCursor(Qt.ClosedHandCursor)
@@ -832,7 +734,6 @@ class MindMapView(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent):
         """Handle mouse move"""
         if self._isPanning:
-            # Pan the view
             delta = event.pos() - self._lastPanPoint
             self._lastPanPoint = event.pos()
             self.horizontalScrollBar().setValue(
@@ -847,7 +748,6 @@ class MindMapView(QGraphicsView):
     def mouseReleaseEvent(self, event: QMouseEvent):
         """Handle mouse release"""
         if event.button() == Qt.MiddleButton:
-            # Stop panning
             self._isPanning = False
             self.setCursor(Qt.ArrowCursor)
         else:
@@ -855,7 +755,6 @@ class MindMapView(QGraphicsView):
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle keyboard events"""
-        # Keyboard navigation could be added here
         super().keyPressEvent(event)
 
     def fit_in_view(self):
@@ -873,10 +772,6 @@ class MindMapView(QGraphicsView):
         """Clear all items from scene"""
         self.scene.clear()
 
-
-# ============================================================================
-# MindMapWorker - Background Filesystem Traversal
-# ============================================================================
 
 class MindMapWorker(QThread):
     """
@@ -897,12 +792,12 @@ class MindMapWorker(QThread):
         guard_limit_reached: Emergency stop triggered (current_count)
     """
 
-    nodes_batch_created = Signal(list)  # List of (name, type, parent_path, metadata) tuples
-    progress_update = Signal(int)  # percentage
-    status_update = Signal(str)  # status message
-    finished = Signal(int)  # total nodes found
-    error = Signal(str)  # error message
-    guard_limit_reached = Signal(int)  # current node count when limit reached
+    nodes_batch_created = Signal(list)
+    progress_update = Signal(int)
+    status_update = Signal(str)
+    finished = Signal(int)
+    error = Signal(str)
+    guard_limit_reached = Signal(int)
 
     def __init__(
         self,
@@ -940,35 +835,30 @@ class MindMapWorker(QThread):
 
         self._is_cancelled = False
         self._nodes_processed = 0
-        self._batch_buffer = []  # Buffer for batched emission
-        self._checkpoint_data = []  # Data for checkpoints
+        self._batch_buffer = []
+        self._checkpoint_data = []
 
     def run(self):
         """Execute the traversal"""
         try:
             self.status_update.emit("Starting filesystem traversal...")
 
-            # Check if partition has filesystem
             if not self.image_handler.has_filesystem(self.start_offset):
                 self.error.emit("No filesystem found at specified offset")
                 return
 
-            # Detect filesystem type and use appropriate root inode
             fs_type = self.image_handler.get_fs_type(self.start_offset)
             self.status_update.emit(f"Detected filesystem: {fs_type}")
 
-            # Determine root inode based on filesystem type
             if fs_type in ['NTFS']:
-                root_inode = 5  # NTFS root MFT entry
+                root_inode = 5
             elif fs_type in ['Ext2', 'Ext3', 'Ext4']:
-                root_inode = 2  # ext* root inode
+                root_inode = 2
             elif fs_type in ['FAT12', 'FAT16', 'FAT32', 'ExFAT']:
-                root_inode = None  # FAT uses path-based root, not inode
+                root_inode = None
             else:
-                # Try with default root access
                 root_inode = None
 
-            # Start BFS traversal
             self._traverse_bfs(root_inode)
 
             if not self._is_cancelled:
@@ -985,31 +875,26 @@ class MindMapWorker(QThread):
         Args:
             root_inode: Starting inode number (or None for path-based filesystems like FAT)
         """
-        # BFS queue: (inode, depth, parent_path)
         queue = deque([(root_inode, 0, "")])
         visited = set()
 
-        # For path-based filesystems, track visited paths instead
         if root_inode is None:
-            visited = set()  # Will track paths instead of inodes
+            visited = set()
 
         while queue and not self._is_cancelled:
-            # Check max_nodes_guard (emergency stop)
             if self._nodes_processed >= self.max_nodes_guard:
                 self.status_update.emit(
                     f"⚠️ Emergency stop: max_nodes_guard ({self.max_nodes_guard:,}) reached"
                 )
                 self.guard_limit_reached.emit(self._nodes_processed)
-                self._flush_batch()  # Emit remaining nodes
+                self._flush_batch()
                 break
 
             inode, depth, parent_path = queue.popleft()
 
-            # Check depth limit (only if specified)
             if self.max_depth is not None and depth > self.max_depth:
                 continue
 
-            # Avoid cycles - use inode for inode-based FS, path for FAT
             if root_inode is None:
                 visit_key = parent_path if parent_path else "/"
             else:
@@ -1020,21 +905,17 @@ class MindMapWorker(QThread):
             visited.add(visit_key)
 
             try:
-                # Get directory contents
                 entries = self.image_handler.get_directory_contents(
                     self.start_offset,
                     inode
                 )
 
-                # Handle None or empty results
                 if not entries:
                     continue
 
-                # Limit children (only if specified)
                 if self.max_children is not None and len(entries) > self.max_children:
                     entries = entries[:self.max_children]
 
-                # Process each entry
                 for entry in entries:
                     if self._is_cancelled:
                         break
@@ -1044,14 +925,11 @@ class MindMapWorker(QThread):
                     size = entry.get('size', 0)
                     entry_inode = entry.get('inode_number')
 
-                    # Skip . and ..
                     if name in ('.', '..'):
                         continue
 
-                    # Determine node type
                     node_type = NodeType.DIRECTORY.value if is_dir else NodeType.FILE.value
 
-                    # Metadata
                     metadata = {
                         'size': size,
                         'inode': entry_inode,
@@ -1061,26 +939,20 @@ class MindMapWorker(QThread):
                         'accessed': entry.get('accessed')
                     }
 
-                    # Add to batch buffer instead of emitting immediately
                     self._batch_buffer.append((name, node_type, parent_path, metadata))
                     self._nodes_processed += 1
 
-                    # Emit batch when buffer is full
                     if len(self._batch_buffer) >= self.batch_emit_size:
                         self._flush_batch()
 
-                    # Write checkpoint periodically
                     if self._nodes_processed % self.checkpoint_interval == 0:
                         self._write_checkpoint()
 
-                    # Add to queue if directory
                     if is_dir:
                         new_path = f"{parent_path}/{name}" if parent_path else name
                         queue.append((entry_inode, depth + 1, new_path))
 
-                    # Update progress
                     if self._nodes_processed % 100 == 0:
-                        # For unlimited mode, show absolute count instead of percentage
                         if self.max_depth is None:
                             progress_pct = min(95, int((self._nodes_processed / self.max_nodes_guard) * 100))
                         else:
@@ -1092,15 +964,12 @@ class MindMapWorker(QThread):
                         )
 
             except Exception as e:
-                # Log error but continue
                 print(f"Error processing inode {inode}: {e}")
                 continue
 
-        # Flush remaining batch
         if self._batch_buffer:
             self._flush_batch()
 
-        # Final progress
         self.progress_update.emit(100)
 
     def _flush_batch(self):
@@ -1129,7 +998,6 @@ class MindMapWorker(QThread):
             with open(checkpoint_file, 'w', encoding='utf-8') as f:
                 json.dump(checkpoint_data, f, indent=2)
 
-            # Keep only last 3 checkpoints
             checkpoints = sorted([
                 f for f in os.listdir(checkpoint_dir)
                 if f.startswith(f"checkpoint_{self.start_offset}_")
@@ -1139,21 +1007,15 @@ class MindMapWorker(QThread):
                     os.remove(os.path.join(checkpoint_dir, old_checkpoint))
 
         except Exception as e:
-            # Don't fail traversal if checkpoint fails
             print(f"Warning: Failed to write checkpoint: {e}")
 
     def cancel(self):
         """Cancel the traversal"""
         self._is_cancelled = True
-        # Flush remaining batch before cancelling
         if self._batch_buffer:
             self._flush_batch()
         self.status_update.emit("Cancelling...")
 
-
-# ============================================================================
-# FullScanConfirmDialog - Confirmation Dialog for Full Scan
-# ============================================================================
 
 class FullScanConfirmDialog(QDialog):
     """
@@ -1170,7 +1032,6 @@ class FullScanConfirmDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        # Warning icon and title
         title_layout = QHBoxLayout()
         warning_label = QLabel("⚠️")
         warning_label.setStyleSheet("font-size: 32px;")
@@ -1182,7 +1043,6 @@ class FullScanConfirmDialog(QDialog):
         title_layout.addStretch()
         layout.addLayout(title_layout)
 
-        # Warning message
         warning_text = QLabel(
             f"<p>You are about to enable <b>unlimited filesystem scanning</b>.</p>"
             f"<p><b>This will:</b></p>"
@@ -1205,11 +1065,9 @@ class FullScanConfirmDialog(QDialog):
         warning_text.setWordWrap(True)
         layout.addWidget(warning_text)
 
-        # Confirmation checkbox
         self.confirm_checkbox = QCheckBox("I understand and want to proceed with full scan")
         layout.addWidget(self.confirm_checkbox)
 
-        # Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
@@ -1225,15 +1083,10 @@ class FullScanConfirmDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-        # Enable OK button only when checkbox is checked
         self.confirm_checkbox.stateChanged.connect(
             lambda state: self.ok_btn.setEnabled(state == Qt.Checked)
         )
 
-
-# ============================================================================
-# MindMapWidget - Main Widget Container
-# ============================================================================
 
 class MindMapWidget(QWidget):
     """
@@ -1249,8 +1102,7 @@ class MindMapWidget(QWidget):
     - Unlimited filesystem traversal with safety controls
     """
 
-    # Signals
-    full_scan_confirm_required = Signal(int)  # Emitted when max_nodes_guard reached (with current count)
+    full_scan_confirm_required = Signal(int)
 
     def __init__(self, parent=None):
         """Initialize the mind map widget"""
@@ -1260,22 +1112,18 @@ class MindMapWidget(QWidget):
         self.start_offset = 0
         self.worker: Optional[MindMapWorker] = None
         self.root_node: Optional[FileNode] = None
-        self.node_map: Dict[str, FileNode] = {}  # path -> node mapping
+        self.node_map: Dict[str, FileNode] = {}
 
-        # Load config
         self._load_config()
 
-        # Settings - UNLIMITED by default (no max_depth or max_children)
-        self.max_depth = None  # Unlimited
-        self.max_children = None  # Unlimited
-        self.full_scan_confirmed = False  # User must confirm full scan
+        self.max_depth = None
+        self.max_children = None
+        self.full_scan_confirmed = False
 
-        # Layout settings
-        self.layout_spacing = 200  # Horizontal spacing between levels
-        self.level_spacing = 100  # Vertical spacing between nodes
-        self.layout_mode = "tree"  # "tree" or "radial"
+        self.layout_spacing = 200
+        self.level_spacing = 100
+        self.layout_mode = "tree"
 
-        # Filter state
         self.active_filters = {
             'Directory': True,
             'Document': True,
@@ -1287,7 +1135,7 @@ class MindMapWidget(QWidget):
             'Code': True,
         }
         self.search_text = ""
-        self.filter_mode = "dim"  # "dim" or "hide"
+        self.filter_mode = "dim"
 
         self._init_ui()
 
@@ -1296,26 +1144,20 @@ class MindMapWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create view first (needed for toolbar connections)
         self.view = MindMapView(self)
 
-        # Toolbar
         self.toolbar = self._create_toolbar()
         layout.addWidget(self.toolbar)
 
-        # Main content area
         content_layout = QHBoxLayout()
 
-        # Mind map view
         content_layout.addWidget(self.view, stretch=1)
 
-        # Side panel (legend + settings)
         self.side_panel = self._create_side_panel()
         content_layout.addWidget(self.side_panel)
 
         layout.addLayout(content_layout)
 
-        # Status bar at bottom
         status_layout = QHBoxLayout()
         self.status_label = QLabel("Ready")
         self.progress_bar = QProgressBar()
@@ -1341,7 +1183,6 @@ class MindMapWidget(QWidget):
             if os.path.exists(config_path):
                 with open(config_path, 'r', encoding='utf-8') as f:
                     self.config = json.load(f)
-                # Merge with defaults for any missing keys
                 for key, value in default_config.items():
                     if key not in self.config:
                         self.config[key] = value
@@ -1357,15 +1198,12 @@ class MindMapWidget(QWidget):
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Generate button
         self.generate_btn = QPushButton("Generate Mind Map")
         self.generate_btn.clicked.connect(self._on_generate)
         toolbar_layout.addWidget(self.generate_btn)
 
-        # Spacer
         toolbar_layout.addSpacing(10)
 
-        # View controls
         fit_btn = QPushButton("Fit to View")
         fit_btn.clicked.connect(self.view.fit_in_view)
         toolbar_layout.addWidget(fit_btn)
@@ -1374,10 +1212,8 @@ class MindMapWidget(QWidget):
         reset_btn.clicked.connect(self.view.reset_view)
         toolbar_layout.addWidget(reset_btn)
 
-        # Spacer
         toolbar_layout.addSpacing(10)
 
-        # Search/Filter
         toolbar_layout.addWidget(QLabel("Search:"))
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Filter by name...")
@@ -1385,31 +1221,25 @@ class MindMapWidget(QWidget):
         self.search_box.textChanged.connect(self._on_search_changed)
         toolbar_layout.addWidget(self.search_box)
 
-        # Clear search button
         clear_search_btn = QPushButton("Clear")
         clear_search_btn.setMaximumWidth(60)
         clear_search_btn.clicked.connect(lambda: self.search_box.clear())
         toolbar_layout.addWidget(clear_search_btn)
 
-        # Spacer
         toolbar_layout.addSpacing(10)
 
-        # Export button
         self.export_btn = QPushButton("Export...")
         self.export_btn.clicked.connect(self._on_export)
         self.export_btn.setEnabled(False)
         toolbar_layout.addWidget(self.export_btn)
 
-        # Spacer
         toolbar_layout.addSpacing(10)
 
-        # Cancel button
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.clicked.connect(self._on_cancel)
         self.cancel_btn.setEnabled(False)
         toolbar_layout.addWidget(self.cancel_btn)
 
-        # Stretch to push everything to the left
         toolbar_layout.addStretch()
 
         return toolbar
@@ -1420,18 +1250,15 @@ class MindMapWidget(QWidget):
         panel.setMaximumWidth(250)
         layout = QVBoxLayout(panel)
 
-        # Settings group
         settings_group = QGroupBox("Settings")
         settings_layout = QFormLayout()
 
-        # Full scan checkbox (replaces depth/children spinners)
         self.full_scan_checkbox = QCheckBox("Enable Full Scan")
         self.full_scan_checkbox.setToolTip("Scan entire filesystem without limits.\nRequires confirmation.")
         self.full_scan_checkbox.setChecked(self.config.get("enable_full_scan_by_default", False))
         self.full_scan_checkbox.stateChanged.connect(self._on_full_scan_toggled)
         settings_layout.addRow("Mode:", self.full_scan_checkbox)
 
-        # Layout mode selector
         layout_mode_widget = QWidget()
         layout_mode_layout = QHBoxLayout(layout_mode_widget)
         layout_mode_layout.setContentsMargins(0, 0, 0, 0)
@@ -1450,7 +1277,6 @@ class MindMapWidget(QWidget):
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
 
-        # Legend group - Interactive with checkboxes
         legend_group = QGroupBox("Filter by Type")
         legend_layout = QVBoxLayout()
 
@@ -1465,23 +1291,20 @@ class MindMapWidget(QWidget):
             ("Code", FILE_TYPE_COLORS[FileTypeCategory.CODE]),
         ]
 
-        self.legend_checkboxes = {}  # Store checkboxes for access
+        self.legend_checkboxes = {}
 
         for name, color in legend_items:
             item_layout = QHBoxLayout()
 
-            # Checkbox for filtering
             checkbox = QCheckBox()
-            checkbox.setChecked(True)  # All enabled by default
+            checkbox.setChecked(True)
             checkbox.stateChanged.connect(lambda state, n=name: self._on_filter_changed(n, state))
             self.legend_checkboxes[name] = checkbox
 
-            # Color indicator
             color_label = QLabel()
             color_label.setFixedSize(20, 20)
             color_label.setStyleSheet(f"background-color: {color.name()}; border: 1px solid black;")
 
-            # Type name
             text_label = QLabel(name)
 
             item_layout.addWidget(checkbox)
@@ -1490,7 +1313,6 @@ class MindMapWidget(QWidget):
             item_layout.addStretch()
             legend_layout.addLayout(item_layout)
 
-        # Filter mode selector
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(QLabel("Mode:"))
         self.filter_mode_dim = QCheckBox("Dim")
@@ -1503,7 +1325,6 @@ class MindMapWidget(QWidget):
         legend_group.setLayout(legend_layout)
         layout.addWidget(legend_group)
 
-        # Stats group
         self.stats_group = QGroupBox("Statistics")
         stats_layout = QVBoxLayout()
         self.stats_label = QLabel("No data")
@@ -1530,7 +1351,6 @@ class MindMapWidget(QWidget):
     def _on_full_scan_toggled(self, state: int):
         """Handle full scan checkbox toggle"""
         if state == Qt.Checked:
-            # Show confirmation dialog
             dialog = FullScanConfirmDialog(
                 max_nodes_guard=self.config.get("max_nodes_guard", 1000000),
                 parent=self
@@ -1540,14 +1360,12 @@ class MindMapWidget(QWidget):
                 self.max_depth = None
                 self.max_children = None
             else:
-                # User cancelled, uncheck the box
                 self.full_scan_checkbox.setChecked(False)
                 self.full_scan_confirmed = False
         else:
-            # Restore default limits when unchecked
             self.full_scan_confirmed = False
-            self.max_depth = None  # Keep unlimited
-            self.max_children = None  # Keep unlimited
+            self.max_depth = None
+            self.max_children = None
 
     def _on_filter_changed(self, filter_name: str, state: int):
         """Handle filter checkbox state change"""
@@ -1568,7 +1386,6 @@ class MindMapWidget(QWidget):
         """Handle layout mode change"""
         self.layout_mode = mode
 
-        # Update checkbox states (mutual exclusion)
         if mode == "tree":
             self.layout_tree_radio.setChecked(True)
             self.layout_radial_radio.setChecked(False)
@@ -1576,7 +1393,6 @@ class MindMapWidget(QWidget):
             self.layout_tree_radio.setChecked(False)
             self.layout_radial_radio.setChecked(True)
 
-        # Re-layout if nodes exist
         if self.root_node:
             self._layout_nodes()
 
@@ -1585,7 +1401,6 @@ class MindMapWidget(QWidget):
         if not self.root_node:
             return
 
-        # Apply filters recursively
         self._filter_node_recursive(self.root_node)
 
     def _filter_node_recursive(self, node: FileNode):
@@ -1595,11 +1410,9 @@ class MindMapWidget(QWidget):
         Args:
             node: FileNode to filter
         """
-        # Determine node category name for filtering
         if node.node_type == NodeType.DIRECTORY or node.node_type == NodeType.ROOT:
             category_name = "Directory"
         else:
-            # Map file category to legend name
             category_map = {
                 FileTypeCategory.DOCUMENT: "Document",
                 FileTypeCategory.IMAGE: "Image",
@@ -1611,18 +1424,14 @@ class MindMapWidget(QWidget):
             }
             category_name = category_map.get(node.file_category, "Directory")
 
-        # Check if node matches filters
         type_visible = self.active_filters.get(category_name, True)
         name_matches = (not self.search_text) or (self.search_text in node.name.lower())
 
-        # Node is filtered if either type is hidden OR name doesn't match
         is_filtered = not (type_visible and name_matches)
 
-        # Apply filter to node
         hide_mode = (self.filter_mode == "hide")
         node.set_filtered(is_filtered, hide_mode)
 
-        # Recursively filter children
         for child in node.children:
             self._filter_node_recursive(child)
 
@@ -1632,19 +1441,16 @@ class MindMapWidget(QWidget):
             QMessageBox.warning(self, "Error", "No image handler set")
             return
 
-        # Clear existing
         self.view.clear_scene()
         self.node_map.clear()
         self.root_node = None
 
-        # Update UI
         self.generate_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)
         self.export_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
 
-        # Create and start worker with config parameters
         self.worker = MindMapWorker(
             self.image_handler,
             self.start_offset,
@@ -1661,7 +1467,6 @@ class MindMapWidget(QWidget):
         self.worker.error.connect(self._on_error)
         self.worker.guard_limit_reached.connect(self._on_guard_limit_reached)
 
-        # Connect API callbacks if they exist (from create_mindmap_from_image)
         if hasattr(self, '_api_complete_callback'):
             self.worker.finished.connect(self._api_complete_callback)
         if hasattr(self, '_api_error_callback'):
@@ -1677,24 +1482,18 @@ class MindMapWidget(QWidget):
 
     def _on_nodes_batch_created(self, nodes_batch: list):
         """Handle batch of nodes from worker"""
-        # Create root node if it doesn't exist
         if not self.root_node:
             self.root_node = FileNode("Root", NodeType.ROOT, 0, FileTypeCategory.UNKNOWN, None)
             self.view.scene.addItem(self.root_node)
             self.node_map[""] = self.root_node
 
-        # Process each node in the batch
         for name, node_type, parent_path, metadata in nodes_batch:
-            # Determine file category
             category = self._categorize_file(name)
 
-            # Convert node type
             ntype = NodeType.DIRECTORY if node_type == NodeType.DIRECTORY.value else NodeType.FILE
 
-            # Get parent node
             parent_node = self.node_map.get(parent_path, self.root_node)
 
-            # Create node
             node = FileNode(
                 name, ntype, metadata.get('size', 0),
                 category, metadata.get('inode'), parent_node
@@ -1702,11 +1501,9 @@ class MindMapWidget(QWidget):
             parent_node.add_child(node)
             self.view.scene.addItem(node)
 
-            # Add connection line
             if node.connection_line:
                 self.view.scene.addItem(node.connection_line)
 
-            # Store in map
             node_path = f"{parent_path}/{name}" if parent_path else name
             self.node_map[node_path] = node
 
@@ -1732,12 +1529,10 @@ class MindMapWidget(QWidget):
         else:
             self._layout_tree()
 
-        # Adjust scene rect
         self.view.scene.setSceneRect(self.view.scene.itemsBoundingRect())
 
     def _layout_tree(self):
         """Layout nodes in a hierarchical tree structure."""
-        # First pass: calculate positions using recursive layout
         def calculate_positions(node, x, y, level_widths):
             """Recursively calculate node positions."""
             if not hasattr(node, 'level'):
@@ -1746,11 +1541,9 @@ class MindMapWidget(QWidget):
             if node.level not in level_widths:
                 level_widths[node.level] = []
 
-            # Position node
             node.setPos(x * self.layout_spacing, y * self.level_spacing)
             level_widths[node.level].append(x)
 
-            # Position children
             if node.children:
                 child_y = y + 1
                 num_children = len(node.children)
@@ -1764,13 +1557,10 @@ class MindMapWidget(QWidget):
         level_widths = {}
         calculate_positions(self.root_node, 0, 0, level_widths)
 
-        # Second pass: update connection lines
         def update_connections(node):
             """Recursively update connection lines."""
             for child in node.children:
-                # Update child's connection line to parent
                 child.update_connection_line()
-                # Recursively update connections for children
                 update_connections(child)
 
         update_connections(self.root_node)
@@ -1781,7 +1571,6 @@ class MindMapWidget(QWidget):
 
         Uses physics simulation to balance node distribution.
         """
-        # Collect all nodes
         all_nodes = []
         def collect_nodes(node):
             all_nodes.append(node)
@@ -1790,24 +1579,21 @@ class MindMapWidget(QWidget):
 
         collect_nodes(self.root_node)
 
-        # Initialize positions in circle around root
         self.root_node.setPos(0, 0)
         radius = 150
 
         node_positions = {self.root_node: QPointF(0, 0)}
 
-        for i, node in enumerate(all_nodes[1:]):  # Skip root
+        for i, node in enumerate(all_nodes[1:]):
             angle = (2 * math.pi * i) / (len(all_nodes) - 1)
             x = radius * math.cos(angle)
             y = radius * math.sin(angle)
             node_positions[node] = QPointF(x, y)
 
-        # Force-directed layout iterations
         iterations = 100
         for iteration in range(iterations):
             forces = {node: QPointF(0, 0) for node in all_nodes}
 
-            # Repulsion between all nodes (Coulomb's law)
             repulsion_strength = 5000
             for i, node1 in enumerate(all_nodes):
                 for node2 in all_nodes[i+1:]:
@@ -1815,9 +1601,8 @@ class MindMapWidget(QWidget):
                     pos2 = node_positions[node2]
                     dx = pos2.x() - pos1.x()
                     dy = pos2.y() - pos1.y()
-                    dist = math.sqrt(dx*dx + dy*dy) + 1  # Avoid division by zero
+                    dist = math.sqrt(dx*dx + dy*dy) + 1
 
-                    # Repulsion force
                     force = repulsion_strength / (dist * dist)
                     fx = (dx / dist) * force
                     fy = (dy / dist) * force
@@ -1825,7 +1610,6 @@ class MindMapWidget(QWidget):
                     forces[node1] -= QPointF(fx, fy)
                     forces[node2] += QPointF(fx, fy)
 
-            # Attraction between parent-child (Hooke's law)
             attraction_strength = 0.1
             for node in all_nodes:
                 if node.parent_node and node.parent_node in node_positions:
@@ -1834,21 +1618,17 @@ class MindMapWidget(QWidget):
                     dx = pos_parent.x() - pos_node.x()
                     dy = pos_parent.y() - pos_node.y()
 
-                    # Spring force
                     forces[node] += QPointF(dx * attraction_strength, dy * attraction_strength)
 
-            # Apply forces (with damping)
             damping = 0.9
             for node in all_nodes:
-                if node != self.root_node:  # Keep root fixed
+                if node != self.root_node:
                     new_pos = node_positions[node] + forces[node] * damping
                     node_positions[node] = new_pos
 
-        # Apply final positions
         for node, pos in node_positions.items():
             node.setPos(pos)
 
-        # Update connection lines
         def update_connections(node):
             for child in node.children:
                 child.update_connection_line()
@@ -1893,13 +1673,10 @@ class MindMapWidget(QWidget):
         self.progress_bar.setVisible(False)
         self.status_label.setText(f"Complete: {node_count} nodes")
 
-        # Layout all nodes in hierarchical structure
         self._layout_nodes()
 
-        # Update stats
         self._update_stats(node_count)
 
-        # Fit in view
         self.view.fit_in_view()
 
     def _on_error(self, message: str):
@@ -1912,7 +1689,6 @@ class MindMapWidget(QWidget):
 
     def _update_stats(self, node_count: int):
         """Update statistics display"""
-        # Count file types
         file_counts = {}
         dir_count = 0
         total_size = 0
@@ -1925,7 +1701,6 @@ class MindMapWidget(QWidget):
                 file_counts[category] = file_counts.get(category, 0) + 1
                 total_size += node.size
 
-        # Format stats
         stats = [
             f"Total Nodes: {node_count}",
             f"Directories: {dir_count}",
@@ -1945,13 +1720,11 @@ class MindMapWidget(QWidget):
         if not self.root_node:
             return
 
-        # Show export dialog
         menu = QMenu(self)
         menu.addAction("Export as PNG", lambda: self._export_png())
         menu.addAction("Export as SVG", lambda: self._export_svg())
         menu.addAction("Export as JSON", lambda: self._export_json())
 
-        # Show menu at export button
         menu.exec_(self.export_btn.mapToGlobal(self.export_btn.rect().bottomLeft()))
 
     def _export_png(self):
@@ -1962,21 +1735,17 @@ class MindMapWidget(QWidget):
         if not file_path:
             return
 
-        # Get scene rect
         rect = self.view.scene.itemsBoundingRect()
-        rect.adjust(-50, -50, 50, 50)  # Add margin
+        rect.adjust(-50, -50, 50, 50)
 
-        # Create image
         image = QImage(rect.size().toSize(), QImage.Format_ARGB32)
         image.fill(Qt.white)
 
-        # Render scene
         painter = QPainter(image)
         painter.setRenderHint(QPainter.Antialiasing)
         self.view.scene.render(painter, QRectF(), rect)
         painter.end()
 
-        # Save
         if image.save(file_path):
             QMessageBox.information(self, "Success", f"Exported to {file_path}")
         else:
@@ -1990,11 +1759,9 @@ class MindMapWidget(QWidget):
         if not file_path:
             return
 
-        # Get scene rect
         rect = self.view.scene.itemsBoundingRect()
-        rect.adjust(-50, -50, 50, 50)  # Add margin
+        rect.adjust(-50, -50, 50, 50)
 
-        # Create SVG generator
         generator = QSvgGenerator()
         generator.setFileName(file_path)
         generator.setSize(rect.size().toSize())
@@ -2002,7 +1769,6 @@ class MindMapWidget(QWidget):
         generator.setTitle("ForensAI Mind Map")
         generator.setDescription("Filesystem visualization exported from ForensAI")
 
-        # Render scene to SVG
         painter = QPainter(generator)
         painter.setRenderHint(QPainter.Antialiasing)
         self.view.scene.render(painter, QRectF(), rect)
@@ -2018,7 +1784,6 @@ class MindMapWidget(QWidget):
         if not file_path:
             return
 
-        # Build tree structure
         def build_tree(node: FileNode) -> dict:
             tree = {
                 'name': node.name,
@@ -2034,7 +1799,6 @@ class MindMapWidget(QWidget):
 
         data = build_tree(self.root_node)
 
-        # Save JSON
         try:
             with open(file_path, 'w') as f:
                 json.dump(data, f, indent=2)
@@ -2064,12 +1828,10 @@ class MindMapWidget(QWidget):
         if not self.root_node:
             return {}
 
-        # Ensure output directory exists
         os.makedirs(out_dir, exist_ok=True)
 
         results = {}
 
-        # Export PNG
         if 'png' in formats:
             png_path = os.path.join(out_dir, 'mindmap.png')
             try:
@@ -2086,7 +1848,6 @@ class MindMapWidget(QWidget):
             except Exception as e:
                 print(f"PNG export failed: {e}")
 
-        # Export SVG
         if 'svg' in formats:
             svg_path = os.path.join(out_dir, 'mindmap.svg')
             try:
@@ -2106,7 +1867,6 @@ class MindMapWidget(QWidget):
             except Exception as e:
                 print(f"SVG export failed: {e}")
 
-        # Export JSON
         if 'json' in formats:
             json_path = os.path.join(out_dir, 'mindmap.json')
             try:
@@ -2160,7 +1920,6 @@ class MindMapWidget(QWidget):
                 'error': 'No data to export - root node not created yet'
             }
 
-        # Auto-generate filename if not provided
         if output_path is None:
             timestamp = QTimer.currentTime().toString() if hasattr(QTimer, 'currentTime') else "unknown"
             output_path = os.path.join(
@@ -2168,7 +1927,6 @@ class MindMapWidget(QWidget):
                 f"full_structure_{self.start_offset}_{timestamp}.json"
             )
 
-        # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         try:
@@ -2188,12 +1946,10 @@ class MindMapWidget(QWidget):
                     'children': []
                 }
 
-                # Add file category for files
                 if node.node_type == NodeType.FILE:
                     tree['category'] = node.file_category.value
                     tree['extension'] = os.path.splitext(node.name)[1].lower()
 
-                # Add extended metadata if requested
                 if include_metadata:
                     tree['metadata'] = {
                         'position': {
@@ -2204,16 +1960,13 @@ class MindMapWidget(QWidget):
                         'filtered': node.is_filtered if hasattr(node, 'is_filtered') else False
                     }
 
-                # Recursively add children
                 for child in node.children:
                     tree['children'].append(build_full_tree(child, current_path))
 
                 return tree
 
-            # Build tree structure
             full_tree = build_full_tree(self.root_node)
 
-            # Calculate statistics
             def count_nodes(tree_dict):
                 """Count total nodes in tree"""
                 count = 1
@@ -2247,7 +2000,6 @@ class MindMapWidget(QWidget):
             type_counts = count_by_type(full_tree)
             total_size = calculate_total_size(full_tree)
 
-            # Build export data
             export_data = {
                 'version': '1.0',
                 'export_type': 'full_structure',
@@ -2267,7 +2019,6 @@ class MindMapWidget(QWidget):
                 'tree': full_tree
             }
 
-            # Write to file
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(export_data, f, indent=2, ensure_ascii=False)
 
@@ -2307,7 +2058,6 @@ class MindMapWidget(QWidget):
             return False
 
         if filepath is None:
-            # Generate default filename based on image path
             if not self.image_handler or not hasattr(self.image_handler, 'image_path'):
                 return False
             image_name = os.path.basename(self.image_handler.image_path)
@@ -2328,7 +2078,6 @@ class MindMapWidget(QWidget):
             "nodes": {}
         }
 
-        # Save node positions and collapsed states
         def save_node_state(node: FileNode, path: str = ""):
             node_path = f"{path}/{node.name}" if path else node.name
             state["nodes"][node_path] = {
@@ -2341,7 +2090,6 @@ class MindMapWidget(QWidget):
         if self.root_node:
             save_node_state(self.root_node)
 
-        # Write to file
         try:
             with open(filepath, 'w') as f:
                 json.dump(state, f, indent=2)
@@ -2362,7 +2110,6 @@ class MindMapWidget(QWidget):
             True if loaded successfully, False otherwise
         """
         if filepath is None:
-            # Generate default filename
             if not self.image_handler or not hasattr(self.image_handler, 'image_path'):
                 return False
             image_name = os.path.basename(self.image_handler.image_path)
@@ -2376,7 +2123,6 @@ class MindMapWidget(QWidget):
             with open(filepath, 'r') as f:
                 state = json.load(f)
 
-            # Restore zoom and pan
             if "zoom_level" in state:
                 zoom_diff = state["zoom_level"] / self.view._zoom_factor
                 self.view.scale(zoom_diff, zoom_diff)
@@ -2385,10 +2131,8 @@ class MindMapWidget(QWidget):
                 self.view.horizontalScrollBar().setValue(int(state["pan_offset"]["x"]))
                 self.view.verticalScrollBar().setValue(int(state["pan_offset"]["y"]))
 
-            # Restore filters
             if "filter_state" in state:
                 self.active_filters = state["filter_state"]
-                # Update checkboxes
                 for name, checked in self.active_filters.items():
                     if name in self.legend_checkboxes:
                         self.legend_checkboxes[name].setChecked(checked)
@@ -2398,17 +2142,14 @@ class MindMapWidget(QWidget):
                 if hasattr(self, 'search_box'):
                     self.search_box.setText(self.search_text)
 
-            # Restore node positions and collapsed states
             if "nodes" in state and self.root_node:
                 def restore_node_state(node: FileNode, path: str = ""):
                     node_path = f"{path}/{node.name}" if path else node.name
                     if node_path in state["nodes"]:
                         node_state = state["nodes"][node_path]
-                        # Restore position
                         if "position" in node_state:
                             pos = node_state["position"]
                             node.setPos(pos["x"], pos["y"])
-                        # Restore collapsed state
                         if "collapsed" in node_state and node_state["collapsed"]:
                             if node.is_expanded:
                                 node.collapse(animated=False)
@@ -2417,7 +2158,6 @@ class MindMapWidget(QWidget):
 
                 restore_node_state(self.root_node)
 
-            # Apply filters
             self._apply_filters()
 
             return True
@@ -2425,10 +2165,6 @@ class MindMapWidget(QWidget):
             print(f"Failed to load layout state: {e}")
             return False
 
-
-# ============================================================================
-# MindMapJob - Async Job Handle
-# ============================================================================
 
 class MindMapJob:
     """
@@ -2494,10 +2230,6 @@ class MindMapJob:
         self.widget._on_cancel()
 
 
-# ============================================================================
-# Public API
-# ============================================================================
-
 def create_mindmap_from_image(
     image_handler,
     start_offset: int = 0,
@@ -2532,30 +2264,24 @@ def create_mindmap_from_image(
         ...     root = job.result()
         ...     print(f"Found {len(root.children)} root items")
     """
-    # Parse options
     options = options or {}
     max_depth = options.get('max_depth', 5)
     max_children = options.get('max_children', 50)
     show_widget = options.get('show_widget', False)
     auto_export = options.get('auto_export_json', False)
 
-    # Create widget
     widget = MindMapWidget()
     widget.max_depth = max_depth
     widget.max_children = max_children
     widget.depth_spin.setValue(max_depth)
     widget.children_spin.setValue(max_children)
 
-    # Set image handler
     widget.set_image_handler(image_handler, start_offset)
 
-    # Create job handle
     job = MindMapJob(widget)
 
-    # Store callbacks to connect after worker is created
     def on_complete(node_count):
         job._is_complete = True
-        # Auto-export JSON
         if auto_export and outdir and widget.root_node:
             json_path = os.path.join(outdir, "mindmap.json")
             def build_tree(node: FileNode) -> dict:
@@ -2581,15 +2307,12 @@ def create_mindmap_from_image(
     def on_error(msg):
         job._error = msg
 
-    # Store callbacks on widget for later connection
     widget._api_complete_callback = on_complete
     widget._api_error_callback = on_error
 
-    # Show widget if requested
     if show_widget:
         widget.show()
 
-    # Start generation (this creates the worker)
     widget._on_generate()
 
     return job

@@ -22,9 +22,9 @@ import os
 class CorrelationInsight:
     """Insight discovered through artifact correlation."""
 
-    insight_type: str  # 'temporal_cluster', 'spatial_cluster', 'hash_match', 'attack_chain'
+    insight_type: str
     description: str
-    confidence: str  # 'high', 'medium', 'low'
+    confidence: str
     artifact_ids: List[str]
     details: Dict = field(default_factory=dict)
 
@@ -33,9 +33,7 @@ class CorrelationInsight:
 class AttackChainStage:
     """A stage in a detected attack chain."""
 
-    stage: str  # 'initial_access', 'execution', 'persistence', 'privilege_escalation',
-                # 'defense_evasion', 'credential_access', 'discovery', 'lateral_movement',
-                # 'collection', 'exfiltration', 'impact'
+    stage: str
     artifacts: List[Dict]
     confidence: str
     mitre_techniques: List[str]
@@ -46,7 +44,7 @@ class IntervalTree:
     """Simple interval tree for O(log n) temporal range queries."""
 
     def __init__(self):
-        self._points = []  # Sorted list of (timestamp_minutes, artifact_id)
+        self._points = []
 
     def insert(self, timestamp_minutes: int, artifact_id: str):
         """Insert a timestamp-artifact pair."""
@@ -130,13 +128,10 @@ class CorrelationEngine:
     - Attack chain reconstruction
     """
 
-    # Time window for considering files "temporally related" (in minutes)
     TEMPORAL_WINDOW_MINUTES = 5
 
-    # Minimum artifacts to form a suspicious cluster
     MIN_CLUSTER_SIZE = 2
 
-    # Attack stage indicators (which rules suggest which stage)
     STAGE_INDICATORS = {
         'initial_access': [
             'executable_in_downloads', 'executable_in_temp',
@@ -166,24 +161,20 @@ class CorrelationEngine:
 
     def __init__(self):
         """Initialize correlation engine with empty indexes."""
-        self.artifacts: Dict[str, Dict] = {}  # artifact_id -> artifact_data
-        self.risk_scores: Dict[str, int] = {}  # artifact_id -> risk_score
-        self.triggered_rules: Dict[str, List[str]] = {}  # artifact_id -> rules
+        self.artifacts: Dict[str, Dict] = {}
+        self.risk_scores: Dict[str, int] = {}
+        self.triggered_rules: Dict[str, List[str]] = {}
 
-        # Indexes for efficient lookup
-        self._temporal_index: Dict[str, Set[str]] = defaultdict(set)  # minute_key -> artifact_ids
-        self._spatial_index: Dict[str, Set[str]] = defaultdict(set)  # dir_path -> artifact_ids
-        self._hash_index: Dict[str, Set[str]] = defaultdict(set)  # hash -> artifact_ids
+        self._temporal_index: Dict[str, Set[str]] = defaultdict(set)
+        self._spatial_index: Dict[str, Set[str]] = defaultdict(set)
+        self._hash_index: Dict[str, Set[str]] = defaultdict(set)
 
-        # Advanced indexes for O(log n) queries
         self._interval_tree = IntervalTree()
         self._path_trie = PathTrie()
 
-        # Incremental clustering support
         self._clusters_dirty = True
         self._cached_clusters = []
 
-        # Discovered clusters and insights
         self._clusters: List[CorrelationInsight] = []
         self._attack_chain: List[AttackChainStage] = []
 
@@ -202,20 +193,16 @@ class CorrelationEngine:
         self.risk_scores[artifact_id] = risk_score
         self.triggered_rules[artifact_id] = rules or []
 
-        # Index by timestamp
         self._index_temporal(artifact_id, artifact)
 
-        # Index by location
         self._index_spatial(artifact_id, artifact)
 
-        # Index by hash
         self._index_hash(artifact_id, artifact)
 
         self._clusters_dirty = True
 
     def _index_temporal(self, artifact_id: str, artifact: Dict):
         """Index artifact by timestamp for temporal clustering."""
-        # Use the most relevant timestamp (modified, created, or accessed)
         for ts_field in ['modified', 'created', 'accessed']:
             ts = artifact.get(ts_field)
             if ts:
@@ -233,7 +220,6 @@ class CorrelationEngine:
         """Index artifact by directory for spatial clustering."""
         path = artifact.get('path', '')
         if path:
-            # Normalize path and extract directory
             dir_path = os.path.dirname(path.lower().replace('/', '\\'))
             if dir_path:
                 self._spatial_index[dir_path].add(artifact_id)
@@ -252,7 +238,6 @@ class CorrelationEngine:
             if isinstance(ts, datetime):
                 return ts.strftime('%Y%m%d%H%M')
             elif isinstance(ts, str):
-                # Try common formats
                 for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S UTC', '%Y-%m-%d']:
                     try:
                         dt = datetime.strptime(ts.split('.')[0], fmt)
@@ -292,7 +277,6 @@ class CorrelationEngine:
         """Find artifacts modified within the temporal window."""
         neighbors = []
 
-        # Get this artifact's timestamp
         for ts_field in ['modified', 'created']:
             ts = artifact.get(ts_field)
             if ts:
@@ -300,7 +284,6 @@ class CorrelationEngine:
                 if center_key:
                     center_dt = self._minute_key_to_datetime(center_key)
                     if center_dt:
-                        # Check surrounding minutes
                         for delta in range(-self.TEMPORAL_WINDOW_MINUTES,
                                            self.TEMPORAL_WINDOW_MINUTES + 1):
                             check_dt = center_dt + timedelta(minutes=delta)
@@ -318,9 +301,8 @@ class CorrelationEngine:
                                     })
                 break
 
-        # Sort by risk score (highest first)
         neighbors.sort(key=lambda x: x['risk_score'], reverse=True)
-        return neighbors[:10]  # Limit to top 10
+        return neighbors[:10]
 
     def _find_spatial_neighbors(self, artifact_id: str, artifact: Dict) -> List[Dict]:
         """Find artifacts in the same directory."""
@@ -341,7 +323,6 @@ class CorrelationEngine:
                             'same_directory': True
                         })
 
-        # Sort by risk score
         neighbors.sort(key=lambda x: x['risk_score'], reverse=True)
         return neighbors[:10]
 
@@ -375,13 +356,10 @@ class CorrelationEngine:
         """
         clusters = []
 
-        # Detect temporal bursts
         clusters.extend(self._detect_temporal_bursts())
 
-        # Detect spatial hotspots
         clusters.extend(self._detect_spatial_hotspots())
 
-        # Detect hash duplicates across locations
         clusters.extend(self._detect_hash_spreading())
 
         self._clusters = clusters
@@ -391,19 +369,16 @@ class CorrelationEngine:
         """Detect groups of high-risk files modified at the same time."""
         bursts = []
 
-        # Group by minute key
         for minute_key, artifact_ids in self._temporal_index.items():
             if len(artifact_ids) < self.MIN_CLUSTER_SIZE:
                 continue
 
-            # Check if any are high-risk
             high_risk_ids = [
                 aid for aid in artifact_ids
-                if self.risk_scores.get(aid, 0) >= 40  # Medium+ risk
+                if self.risk_scores.get(aid, 0) >= 40
             ]
 
             if len(high_risk_ids) >= self.MIN_CLUSTER_SIZE:
-                # Calculate combined risk
                 total_risk = sum(self.risk_scores.get(aid, 0) for aid in high_risk_ids)
                 avg_risk = total_risk / len(high_risk_ids)
 
@@ -432,11 +407,9 @@ class CorrelationEngine:
             if len(artifact_ids) < self.MIN_CLUSTER_SIZE:
                 continue
 
-            # Check for suspicious directories
             suspicious_dirs = ['temp', 'tmp', 'appdata', 'downloads', 'startup', 'run']
             is_suspicious_location = any(sd in dir_path.lower() for sd in suspicious_dirs)
 
-            # Check for high-risk files
             high_risk_ids = [
                 aid for aid in artifact_ids
                 if self.risk_scores.get(aid, 0) >= 40
@@ -474,7 +447,6 @@ class CorrelationEngine:
             if len(artifact_ids) < 2:
                 continue
 
-            # Get unique directories
             directories = set()
             for aid in artifact_ids:
                 artifact = self.artifacts.get(aid, {})
@@ -483,7 +455,6 @@ class CorrelationEngine:
                     directories.add(os.path.dirname(path.lower()))
 
             if len(directories) >= 2:
-                # Same file in multiple locations - suspicious
                 spreading.append(CorrelationInsight(
                     insight_type='hash_spreading',
                     description=f'Identical file found in {len(directories)} different locations',
@@ -510,12 +481,10 @@ class CorrelationEngine:
         """
         stages: Dict[str, List[Dict]] = defaultdict(list)
 
-        # Map each artifact to potential attack stages
         for artifact_id, rules in self.triggered_rules.items():
             artifact = self.artifacts.get(artifact_id, {})
             risk_score = self.risk_scores.get(artifact_id, 0)
 
-            # Only consider medium+ risk artifacts
             if risk_score < 40:
                 continue
 
@@ -530,7 +499,6 @@ class CorrelationEngine:
                         'timestamp': artifact.get('modified') or artifact.get('created')
                     })
 
-        # Build timeline
         timeline = []
         stage_order = [
             'initial_access', 'execution', 'persistence',
@@ -539,20 +507,17 @@ class CorrelationEngine:
 
         for stage in stage_order:
             if stage in stages and stages[stage]:
-                # Sort artifacts in this stage by timestamp
                 stage_artifacts = sorted(
                     stages[stage],
                     key=lambda x: str(x.get('timestamp', ''))
                 )
 
-                # Determine timestamp range
                 timestamps = [a.get('timestamp') for a in stage_artifacts if a.get('timestamp')]
                 ts_range = (
                     min(timestamps) if timestamps else None,
                     max(timestamps) if timestamps else None
                 )
 
-                # Collect MITRE techniques
                 mitre_map = {
                     'executable_in_downloads': 'T1105',
                     'executable_in_temp': 'T1059',
@@ -568,7 +533,6 @@ class CorrelationEngine:
                         if rule in mitre_map:
                             mitre_techniques.add(mitre_map[rule])
 
-                # Determine confidence
                 avg_risk = sum(a['risk_score'] for a in stage_artifacts) / len(stage_artifacts)
                 confidence = 'high' if avg_risk >= 70 else 'medium' if avg_risk >= 50 else 'low'
 
@@ -592,13 +556,11 @@ class CorrelationEngine:
         """
         related = self.find_related(artifact_id)
 
-        # Find which clusters this artifact belongs to
         artifact_clusters = [
             c for c in self._clusters
             if artifact_id in c.artifact_ids
         ]
 
-        # Find attack chain stage
         attack_stage = None
         for stage in self._attack_chain:
             artifact_ids_in_stage = [
@@ -653,7 +615,6 @@ class CorrelationEngine:
                 'timeline_span': None
             }
 
-        # Calculate overall confidence
         stage_confidences = [s.confidence for s in timeline]
         high_count = stage_confidences.count('high')
         total = len(stage_confidences)
@@ -665,7 +626,6 @@ class CorrelationEngine:
         else:
             overall_confidence = 'low'
 
-        # Calculate timeline span
         all_timestamps = []
         for stage in timeline:
             if stage.timestamp_range[0]:
@@ -677,7 +637,6 @@ class CorrelationEngine:
         if all_timestamps:
             timeline_span = {'start': min(all_timestamps), 'end': max(all_timestamps)}
 
-        # Build stage summaries
         stages = []
         for stage in timeline:
             stages.append({
@@ -738,7 +697,6 @@ class CorrelationEngine:
         self._cached_clusters = []
 
 
-# Singleton instance
 _correlation_engine: Optional[CorrelationEngine] = None
 
 

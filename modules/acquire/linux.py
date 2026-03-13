@@ -50,7 +50,7 @@ class LinuxAcquirer(BaseAcquirer):
         Raises:
             AcquisitionError: If lsblk fails
         """
-        cmd = ['lsblk', '-J']  # JSON output
+        cmd = ['lsblk', '-J']
         if args:
             cmd.extend(args)
 
@@ -89,11 +89,9 @@ class LinuxAcquirer(BaseAcquirer):
 
         size_str = size_str.strip().upper()
 
-        # If it's just a number, assume bytes
         if size_str.isdigit():
             return int(size_str)
 
-        # Parse with unit suffix
         units = {
             'B': 1,
             'K': 1024,
@@ -111,7 +109,6 @@ class LinuxAcquirer(BaseAcquirer):
                 except ValueError:
                     return 0
 
-        # Try parsing as plain number
         try:
             return int(size_str)
         except ValueError:
@@ -142,8 +139,6 @@ class LinuxAcquirer(BaseAcquirer):
         disks = []
 
         try:
-            # Get disk-only output with all columns
-            # -d: no partitions, -o: specify columns, -b: bytes
             result = subprocess.run(
                 ['lsblk', '-dJbo', 'NAME,SIZE,MODEL,SERIAL,TYPE,ROTA,TRAN,VENDOR'],
                 capture_output=True,
@@ -152,7 +147,6 @@ class LinuxAcquirer(BaseAcquirer):
             )
 
             if result.returncode != 0:
-                # Try simpler command if extended columns fail
                 result = subprocess.run(
                     ['lsblk', '-dJbo', 'NAME,SIZE,TYPE'],
                     capture_output=True,
@@ -166,7 +160,6 @@ class LinuxAcquirer(BaseAcquirer):
             for dev in devices:
                 dev_type = dev.get('type', '')
 
-                # Only include disk types (not partitions, loops, etc.)
                 if dev_type not in ['disk']:
                     continue
 
@@ -174,7 +167,6 @@ class LinuxAcquirer(BaseAcquirer):
                 if not name:
                     continue
 
-                # Skip loop devices and ram disks
                 if name.startswith('loop') or name.startswith('ram'):
                     continue
 
@@ -182,10 +174,9 @@ class LinuxAcquirer(BaseAcquirer):
                 if isinstance(size, str):
                     size = self._parse_size(size)
 
-                # Determine interface type
                 tran = dev.get('tran', '').upper()
                 if tran:
-                    interface = tran  # sata, usb, nvme, etc.
+                    interface = tran
                 elif name.startswith('nvme'):
                     interface = 'NVMe'
                 elif name.startswith('sd'):
@@ -227,7 +218,6 @@ class LinuxAcquirer(BaseAcquirer):
         partitions = []
 
         try:
-            # Get all block devices with partition info
             result = subprocess.run(
                 ['lsblk', '-Jbo', 'NAME,SIZE,TYPE,FSTYPE,LABEL,MOUNTPOINT,PKNAME'],
                 capture_output=True,
@@ -246,7 +236,6 @@ class LinuxAcquirer(BaseAcquirer):
                 dev_type = dev.get('type', '')
                 name = dev.get('name', '')
 
-                # Include partitions
                 if dev_type == 'part':
                     size = dev.get('size', 0)
                     if isinstance(size, str):
@@ -262,7 +251,6 @@ class LinuxAcquirer(BaseAcquirer):
                         disk_device=self._get_device_path(parent_name) if parent_name else None
                     ))
 
-                # Process children (partitions of a disk)
                 for child in dev.get('children', []):
                     process_device(child, name)
 
@@ -288,25 +276,20 @@ class LinuxAcquirer(BaseAcquirer):
         Returns:
             Size in bytes or None
         """
-        # Method 1: Try /sys/block
         name = os.path.basename(device_path)
-        # Handle partition names (sda1 -> sda)
         base_name = name.rstrip('0123456789')
         if name != base_name:
-            # It's a partition
             sys_path = f'/sys/class/block/{name}/size'
         else:
             sys_path = f'/sys/block/{name}/size'
 
         try:
             with open(sys_path, 'r') as f:
-                # Size is in 512-byte sectors
                 sectors = int(f.read().strip())
                 return sectors * 512
         except:
             pass
 
-        # Method 2: Try blockdev command
         try:
             result = subprocess.run(
                 ['blockdev', '--getsize64', device_path],
@@ -319,10 +302,9 @@ class LinuxAcquirer(BaseAcquirer):
         except:
             pass
 
-        # Method 3: Seek to end
         try:
             with open(device_path, 'rb') as f:
-                f.seek(0, 2)  # Seek to end
+                f.seek(0, 2)
                 return f.tell()
         except:
             pass
@@ -346,18 +328,15 @@ class LinuxAcquirer(BaseAcquirer):
                 "Please run with: sudo python your_script.py"
             )
 
-        # Normalize device path
         if not device_path.startswith('/dev/'):
             device_path = f'/dev/{device_path}'
 
-        # Check device exists
         if not os.path.exists(device_path):
             raise AcquisitionError(f"Device not found: {device_path}")
 
         hashers = create_hashers(compute_hashes)
         tracker = ProgressTracker()
 
-        # Get device size
         total_size = self._get_device_size(device_path)
         if total_size:
             tracker.total_size = total_size
@@ -376,11 +355,9 @@ class LinuxAcquirer(BaseAcquirer):
             src_file = open(device_path, 'rb')
 
             self.logger.info(f"Writing to: {output_path}")
-            # Create parent directory if needed
             os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
             dst_file = open(output_path, 'wb')
 
-            # Stream loop
             while True:
                 if abort_check and abort_check():
                     self.logger.warning("Acquisition aborted by user")
@@ -411,13 +388,11 @@ class LinuxAcquirer(BaseAcquirer):
                     stats = tracker.update(bytes_written)
                     progress_callback(bytes_written, total_size, stats['speed_mbps'])
 
-            # Cleanup
             src_file.close()
             src_file = None
             dst_file.close()
             dst_file = None
 
-            # Final stats
             tracker.update(bytes_written)
             final_stats = tracker.get_final_stats()
 
@@ -493,7 +468,6 @@ class LinuxAcquirer(BaseAcquirer):
                 "Please run with sudo."
             )
 
-        # Normalize device path
         if not device_path.startswith('/dev/'):
             device_path = f'/dev/{device_path}'
 
@@ -502,10 +476,8 @@ class LinuxAcquirer(BaseAcquirer):
         if not os.path.exists(device_path):
             raise AcquisitionError(f"Device not found: {device_path}")
 
-        # Try to open device
         try:
             with open(device_path, 'rb') as f:
-                # Try to read first sector
                 f.read(512)
                 self.logger.info(f"Device opened successfully: {device_path}")
         except PermissionError:
@@ -516,7 +488,6 @@ class LinuxAcquirer(BaseAcquirer):
         except Exception as e:
             raise AcquisitionError(f"Cannot open device: {e}")
 
-        # Get size
         total_size = self._get_device_size(device_path)
         size_available = total_size is not None
 

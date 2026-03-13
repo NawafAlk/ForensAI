@@ -27,22 +27,18 @@ class RuleFiringLog:
 
     timestamp: str
     event_type: str = "rule_firing"
-    artifact_id: str = ""  # Inode or unique identifier
+    artifact_id: str = ""
     artifact_name: str = ""
     artifact_path: str = ""
 
-    # Scoring details
     final_score: int = 0
     severity: str = ""
 
-    # Rule chain (which rules fired and their weights)
-    rules_fired: List[Dict[str, Any]] = field(default_factory=list)  # [{'code': 'xxx', 'weight': 85, 'description': '...'}]
+    rules_fired: List[Dict[str, Any]] = field(default_factory=list)
     total_weight: int = 0
 
-    # Input data hash (for verifying artifact hasn't changed)
     input_hash: str = ""
 
-    # Log integrity
     log_id: str = ""
     previous_hash: str = ""
 
@@ -54,33 +50,26 @@ class AIInteractionLog:
     timestamp: str
     event_type: str = "ai_interaction"
 
-    # AI service details
     model: str = ""
     base_url: str = ""
 
-    # Request
     prompt: str = ""
-    prompt_tokens: int = 0  # If available
+    prompt_tokens: int = 0
 
-    # Response
     response: str = ""
-    response_tokens: int = 0  # If available
+    response_tokens: int = 0
     duration_ms: int = 0
 
-    # Context
     artifact_id: str = ""
     artifact_name: str = ""
-    interaction_purpose: str = ""  # "explain_file", "explain_risk", "overwrite_story", etc.
+    interaction_purpose: str = ""
 
-    # Additional metadata
     temperature: float = 0.0
     top_p: float = 0.0
 
-    # Confidence/uncertainty (if available)
     confidence: Optional[float] = None
     uncertainty_factors: List[str] = field(default_factory=list)
 
-    # Log integrity
     log_id: str = ""
     previous_hash: str = ""
 
@@ -105,19 +94,15 @@ class AuditLogger:
         self.log_directory = Path(log_directory)
         self.log_directory.mkdir(parents=True, exist_ok=True)
 
-        # Separate log files for different event types
         self.rule_log_path = self.log_directory / f"{case_id}_rules.jsonl"
         self.ai_log_path = self.log_directory / f"{case_id}_ai.jsonl"
         self.index_path = self.log_directory / f"{case_id}_index.json"
 
-        # Thread safety
         self._lock = threading.Lock()
 
-        # Last hash for chaining (separate per log type)
         self._last_rule_hash = self._get_last_hash(self.rule_log_path)
         self._last_ai_hash = self._get_last_hash(self.ai_log_path)
 
-        # Session metadata
         self.session_start = datetime.utcnow().isoformat() + "Z"
         self._log_index = self._load_or_create_index()
 
@@ -143,13 +128,10 @@ class AuditLogger:
             timestamp = datetime.utcnow().isoformat() + "Z"
             log_id = self._generate_log_id("RULE", timestamp, artifact_id)
 
-            # Calculate total weight
             total_weight = sum(r.get('weight', 0) for r in rules_fired)
 
-            # Hash input data for integrity
             input_hash = self._hash_dict(artifact_data) if artifact_data else ""
 
-            # Create log entry
             log_entry = RuleFiringLog(
                 timestamp=timestamp,
                 artifact_id=artifact_id,
@@ -164,13 +146,10 @@ class AuditLogger:
                 previous_hash=self._last_rule_hash
             )
 
-            # Write to log
             self._append_log(self.rule_log_path, log_entry)
 
-            # Update chain
             self._last_rule_hash = self._hash_dict(asdict(log_entry))
 
-            # Update index
             self._update_index("rule_firing", log_id, artifact_name)
 
             return log_id
@@ -205,11 +184,9 @@ class AuditLogger:
             timestamp = datetime.utcnow().isoformat() + "Z"
             log_id = self._generate_log_id("AI", timestamp, artifact_id)
 
-            # Estimate token counts (rough approximation)
-            prompt_tokens = len(prompt.split()) * 1.3  # Rough estimate
+            prompt_tokens = len(prompt.split()) * 1.3
             response_tokens = len(response.split()) * 1.3
 
-            # Create log entry
             log_entry = AIInteractionLog(
                 timestamp=timestamp,
                 model=model,
@@ -230,13 +207,10 @@ class AuditLogger:
                 previous_hash=self._last_ai_hash
             )
 
-            # Write to log
             self._append_log(self.ai_log_path, log_entry)
 
-            # Update chain
             self._last_ai_hash = self._hash_dict(asdict(log_entry))
 
-            # Update index
             self._update_index("ai_interaction", log_id, artifact_name)
 
             return log_id
@@ -281,7 +255,6 @@ class AuditLogger:
 
         results['all_valid'] = rule_result['valid'] and ai_result['valid']
 
-        # Get final chain hash for display
         final_hash = self.get_final_chain_hash()
         if final_hash:
             results['final_hash'] = final_hash
@@ -299,9 +272,8 @@ class AuditLogger:
         rule_hash = self._get_last_hash(self.rule_log_path)
         ai_hash = self._get_last_hash(self.ai_log_path)
 
-        # Combine both hashes
         combined = rule_hash + ai_hash
-        if combined == ("0" * 64) * 2:  # Both are genesis hashes
+        if combined == ("0" * 64) * 2:
             return None
 
         return hashlib.sha256(combined.encode()).hexdigest()
@@ -322,7 +294,6 @@ class AuditLogger:
             'ai_logs': []
         }
 
-        # Read rule logs
         if self.rule_log_path.exists():
             with open(self.rule_log_path, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -330,7 +301,6 @@ class AuditLogger:
                     if entry.get('artifact_id') == artifact_id:
                         history['rule_logs'].append(entry)
 
-        # Read AI logs
         if self.ai_log_path.exists():
             with open(self.ai_log_path, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -340,7 +310,6 @@ class AuditLogger:
 
         return history
 
-    # === Private Methods ===
 
     def _append_log(self, log_path: Path, log_entry):
         """Append log entry to file (JSONL format)."""
@@ -361,18 +330,16 @@ class AuditLogger:
     def _get_last_hash(self, log_path: Path) -> str:
         """Get hash of last entry in log file."""
         if not log_path.exists():
-            return "0" * 64  # Genesis hash
+            return "0" * 64
 
         try:
             with open(log_path, 'rb') as f:
-                # Read last line
-                f.seek(0, 2)  # Go to end
+                f.seek(0, 2)
                 file_size = f.tell()
 
                 if file_size == 0:
                     return "0" * 64
 
-                # Read backwards to find last complete line
                 buffer_size = min(8192, file_size)
                 f.seek(-buffer_size, 2)
                 lines = f.read().decode('utf-8').splitlines()
@@ -406,7 +373,6 @@ class AuditLogger:
             'timestamp': datetime.utcnow().isoformat() + "Z"
         })
 
-        # Write index (periodically, not every time for performance)
         if len(self._log_index['events']) % 10 == 0:
             with open(self.index_path, 'w') as f:
                 json.dump(self._log_index, f, indent=2)
@@ -422,19 +388,16 @@ class AuditLogger:
             'integrity_check': self.verify_integrity()
         }
 
-        # Read all rule logs
         if self.rule_log_path.exists():
             with open(self.rule_log_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     export_data['rule_logs'].append(json.loads(line))
 
-        # Read all AI logs
         if self.ai_log_path.exists():
             with open(self.ai_log_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     export_data['ai_logs'].append(json.loads(line))
 
-        # Write export
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(export_data, f, indent=2, ensure_ascii=False)
 
@@ -447,10 +410,8 @@ class AuditLogger:
         with open(output_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
 
-            # Write header
             writer.writerow(['Timestamp', 'Type', 'Artifact', 'Details', 'Log ID'])
 
-            # Write rule logs
             if self.rule_log_path.exists():
                 with open(self.rule_log_path, 'r', encoding='utf-8') as log_f:
                     for line in log_f:
@@ -464,7 +425,6 @@ class AuditLogger:
                             entry['log_id']
                         ])
 
-            # Write AI logs
             if self.ai_log_path.exists():
                 with open(self.ai_log_path, 'r', encoding='utf-8') as log_f:
                     for line in log_f:
@@ -485,7 +445,7 @@ class AuditLogger:
         if not log_path.exists():
             return {'valid': True, 'entries': 0, 'message': 'No logs to verify'}
 
-        previous_hash = "0" * 64  # Genesis hash
+        previous_hash = "0" * 64
         entry_count = 0
 
         try:
@@ -494,7 +454,6 @@ class AuditLogger:
                     entry = json.loads(line)
                     entry_count += 1
 
-                    # Verify previous hash
                     if entry.get('previous_hash') != previous_hash:
                         return {
                             'valid': False,
@@ -502,7 +461,6 @@ class AuditLogger:
                             'message': f'Chain broken at entry {entry_count}'
                         }
 
-                    # Update for next iteration
                     previous_hash = self._hash_dict(entry)
 
             return {
@@ -518,8 +476,6 @@ class AuditLogger:
                 'message': f'Verification error: {str(e)}'
             }
 
-
-# === Singleton Management ===
 
 _audit_loggers: Dict[str, AuditLogger] = {}
 

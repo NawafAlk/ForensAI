@@ -12,13 +12,11 @@ def test_forensic_image(image_path):
     print(f"{'='*60}\n")
 
     try:
-        # Load the image
         print("1. Loading image...")
         handler = ImageHandler(image_path)
         print(f"   [OK] Image loaded successfully")
         print(f"   Size: {handler.get_readable_size(handler.get_size())}")
 
-        # Get partitions
         print("\n2. Analyzing partitions...")
         partitions = handler.get_partitions()
         if partitions:
@@ -30,7 +28,6 @@ def test_forensic_image(image_path):
         else:
             print(f"   [INFO] No partitions found (may be direct filesystem)")
 
-        # Find first partition with filesystem
         partition_offset = None
         for addr, desc, start, length in partitions:
             if handler.has_filesystem(start):
@@ -38,33 +35,28 @@ def test_forensic_image(image_path):
                 break
 
         if partition_offset is None and handler.fs_info:
-            # Direct filesystem
             partition_offset = 0
 
         if partition_offset is not None:
-            # Get root directory
             print(f"\n3. Reading root directory (offset: {partition_offset})...")
             entries = handler.get_directory_contents(partition_offset)
             print(f"   [OK] Found {len(entries)} entries")
 
-            # Show first 10 entries
             print("\n   First 10 entries:")
             for i, entry in enumerate(entries[:10]):
                 icon = "[DIR]" if entry["is_directory"] else "[FILE]"
                 size_str = handler.get_readable_size(entry["size"]) if not entry["is_directory"] else "DIR"
                 print(f"     {icon} {entry['name']:<30} {size_str:>10}  {entry['modified']}")
 
-            # Try to read a file
             print("\n4. Testing file content reading...")
             for entry in entries[:20]:
-                if not entry["is_directory"] and entry["size"] > 0 and entry["size"] < 1024*1024:  # Small file
+                if not entry["is_directory"] and entry["size"] > 0 and entry["size"] < 1024*1024:
                     inode = entry["inode_number"]
                     print(f"   Reading: {entry['name']} (inode: {inode})...")
                     content, metadata = handler.get_file_content(inode, partition_offset)
 
                     if content:
                         print(f"   [OK] Read {len(content)} bytes")
-                        # Show first 64 bytes as hex
                         hex_preview = ' '.join(f'{b:02X}' for b in content[:64])
                         print(f"   First 64 bytes: {hex_preview}")
                         break
@@ -87,7 +79,6 @@ def test_forensic_image(image_path):
 
 
 if __name__ == "__main__":
-    # Test with the .dd file found in evidence folder
     test_image = r"C:\Users\NAWAF\Dropbox\PC\Desktop\projects\ForensAI\evidence\image_20251106T210112.dd"
 
     if os.path.exists(test_image):

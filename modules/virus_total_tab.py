@@ -46,9 +46,8 @@ class VirusTotal(QWidget):
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(0, 0, 0, 0)
 
-        # First toolbar for the VirusTotal logo
         self.logo_toolbar = QToolBar(self)
-        self.logo_toolbar.setContentsMargins(0, 0, 0, 0)  # Add some margins to the toolbar for better aesthetics
+        self.logo_toolbar.setContentsMargins(0, 0, 0, 0)
 
         self.setup_logo_toolbar()
         self.layout.addWidget(self.logo_toolbar)
@@ -57,22 +56,20 @@ class VirusTotal(QWidget):
         self.action_toolbar.setContentsMargins(0, 0, 0, 0)
         self.setup_action_toolbar()
         self.layout.addWidget(self.action_toolbar)
-        self.action_toolbar.setVisible(False)  # Hide this toolbar initially
+        self.action_toolbar.setVisible(False)
 
         buttonLayout = QHBoxLayout()
-        # align the button vertically and horizontally
-        buttonLayout.setAlignment(Qt.AlignCenter)  # Align the buttons to the center
+        buttonLayout.setAlignment(Qt.AlignCenter)
 
         self.pass_hash_button = QPushButton("Pass Hash")
         self.pass_hash_button.clicked.connect(self.pass_hash)
-        self.pass_hash_button.setFixedSize(120, 40)  # Set fixed size for a modern look
+        self.pass_hash_button.setFixedSize(120, 40)
 
         buttonLayout.addWidget(self.pass_hash_button)
 
-        # Upload File Button
         self.upload_file_button = QPushButton("Upload File")
         self.upload_file_button.clicked.connect(self.upload_file)
-        self.upload_file_button.setFixedSize(120, 40)  # Set fixed size for a modern look
+        self.upload_file_button.setFixedSize(120, 40)
 
         buttonLayout.addWidget(self.upload_file_button)
         self.layout.addLayout(buttonLayout)
@@ -132,12 +129,11 @@ class VirusTotal(QWidget):
         self.info_text_edit.setVisible(False)
         self.pass_hash_button.setVisible(True)
         self.upload_file_button.setVisible(True)
-        self.action_toolbar.setVisible(False)  # Hide action toolbar
+        self.action_toolbar.setVisible(False)
 
     def set_file_hash(self, file_hash):
         self.current_file_hash = file_hash
 
-    # set file content to expect file content as bytes and name as string
     def set_file_content(self, file_content, file_name="unnamed_file"):
         """Sets the current file content and assigns a default name if none is provided."""
         self.current_file_content = file_content
@@ -154,8 +150,6 @@ class VirusTotal(QWidget):
             return
 
         if self.current_file_content and self.current_file_name:
-            # Assuming current_file_content is the content of the file to upload,
-            # and current_file_name is the name of the file.
             self.upload_file_to_virustotal(self.current_file_content, self.current_file_name)
         else:
             self.info_text_edit.setText("No file content or name provided.")
@@ -171,8 +165,6 @@ class VirusTotal(QWidget):
 
     def upload_file_to_virustotal(self, file_content, file_name):
         """Uploads a zipped file to VirusTotal."""
-        # Here, file_content should be the content of the file to upload,
-        # and file_name should be the name of the file inside the zip.
         zip_buffer = self.zip_file_in_memory(file_content, file_name)
 
         url = "https://www.virustotal.com/api/v3/files"
@@ -219,29 +211,25 @@ class VirusTotal(QWidget):
         self.upload_file_button.setVisible(False)
         if self.current_file_hash:
             data = self.vt_getresult(self.current_file_hash)
-            if not data:  # Check if the data is empty. If empty, it means there was a rate limit error.
+            if not data:
                 self.info_text_edit.setText("Failed to fetch data.")
                 return
             info_text = self.format_data_as_html(data)
             self.info_text_edit.setHtml(info_text)
 
     def vt_getresult(self, hashes):
-        # Check if we're on a new day
         if date.today() != self.current_date:
             self.current_date = date.today()
             self.daily_requests_made = 0
 
-        # Check if we've exceeded daily limit
         if self.daily_requests_made >= 500:
             self.info_text_edit.setPlainText("Daily request limit exceeded. Please try again tomorrow.")
             return {}
 
-        # Check if we made a request in the last minute
         current_time = time()
         if current_time - self.last_request_time < 60:
             self.requests_made_last_minute += 1
             if self.requests_made_last_minute > 3:
-                # Inform the user about the rate limit with enhanced formatting
                 self.info_text_edit.setHtml(
                     '<div style="text-align: center; padding: 20px;">'
                     '<p style="font-size: 20px; font-weight: bold;">Rate Limit Exceeded</p>'
@@ -252,10 +240,8 @@ class VirusTotal(QWidget):
                 )
                 return {}
         else:
-            # If it's been more than a minute since the last request, reset the counter
             self.requests_made_last_minute = 1
 
-        # Update the last request time and daily requests count
         self.last_request_time = current_time
         self.daily_requests_made += 1
 
@@ -266,7 +252,6 @@ class VirusTotal(QWidget):
         params = {'apikey': self.api_key, 'resource': hashes}
         response = requests_post('https://www.virustotal.com/vtapi/v2/file/report', params=params, headers=headers)
 
-        # Handle the case where the response is not a valid JSON (for example, if the rate limit is exceeded)
         try:
             return response.json()
         except RequestException:
@@ -274,7 +259,6 @@ class VirusTotal(QWidget):
             return {}
 
     def format_data_as_html(self, data):
-        # Extract main details from the data
         md5 = data.get('md5', 'N/A')
         sha1 = data.get('sha1', 'N/A')
         sha256 = data.get('sha256', 'N/A')
@@ -283,7 +267,6 @@ class VirusTotal(QWidget):
         total = data.get('total', 0)
         permalink = data.get('permalink', 'N/A')
 
-        # Extract and format the scan results
         scans = data.get('scans', {})
         scan_rows = ""
         for antivirus, result in scans.items():
@@ -301,7 +284,6 @@ class VirusTotal(QWidget):
             </tr>
             """
 
-        # Create the HTML content
         html_content = f"""
         <div style="font-family: Arial;">
             <h2>VirusTotal Information</h2>

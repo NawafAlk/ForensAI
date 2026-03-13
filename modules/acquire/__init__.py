@@ -37,7 +37,6 @@ Usage:
 import platform
 from typing import List, Optional, Dict
 
-# Import base classes and types (always available)
 from .base import (
     AcquisitionError,
     DiskInfo,
@@ -48,7 +47,6 @@ from .base import (
     AbortCheck
 )
 
-# Import common utilities (always available)
 from .common import (
     verify_hash,
     write_metadata_json,
@@ -58,7 +56,6 @@ from .common import (
     acquire_with_ewfacquire
 )
 
-# Platform detection and acquirer selection
 _system = platform.system()
 
 if _system == 'Windows':
@@ -68,8 +65,6 @@ elif _system == 'Linux':
     from .linux import LinuxAcquirer
     _AcquirerClass = LinuxAcquirer
 else:
-    # Fallback for other platforms (macOS, BSD, etc.)
-    # Could add support later
     _AcquirerClass = None
 
 
@@ -91,7 +86,6 @@ def _get_acquirer() -> BaseAcquirer:
     return _AcquirerClass()
 
 
-# Create default acquirer instance
 _acquirer = None
 
 
@@ -102,10 +96,6 @@ def _ensure_acquirer() -> BaseAcquirer:
         _acquirer = _get_acquirer()
     return _acquirer
 
-
-# ============================================================================
-# Unified API Functions
-# ============================================================================
 
 def is_admin() -> bool:
     """
@@ -232,10 +222,6 @@ def is_supported() -> bool:
     return _AcquirerClass is not None
 
 
-# ============================================================================
-# Legacy Compatibility Functions (for backward compatibility with old API)
-# ============================================================================
-
 def list_physical_disks_windows() -> List[Dict]:
     """
     Legacy function for Windows disk listing.
@@ -303,7 +289,6 @@ def acquire_raw_windows(
     if _system != 'Windows':
         raise AcquisitionError("This function is only supported on Windows")
 
-    # Determine device path
     if device_path:
         dev = device_path
     elif drive_number is not None:
@@ -323,7 +308,6 @@ def acquire_raw_windows(
         max_bytes=max_bytes
     )
 
-    # Convert to dict for backward compatibility
     return result.to_dict()
 
 
@@ -348,17 +332,13 @@ def dry_run_check_device(
     return dry_run_check(dev)
 
 
-# Export all public symbols
 __all__ = [
-    # Exceptions
     'AcquisitionError',
 
-    # Data classes
     'DiskInfo',
     'PartitionInfo',
     'AcquisitionResult',
 
-    # Main API
     'is_admin',
     'list_physical_disks',
     'list_partitions',
@@ -368,14 +348,12 @@ __all__ = [
     'get_platform',
     'is_supported',
 
-    # Utilities
     'verify_hash',
     'write_metadata_json',
     'simulate_acquisition',
     'format_size',
     'acquire_with_ewfacquire',
 
-    # Legacy compatibility
     'list_physical_disks_windows',
     'list_logical_drives_windows',
     'acquire_raw_windows',

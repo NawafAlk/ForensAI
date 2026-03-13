@@ -28,13 +28,13 @@ import hashlib
 @dataclass
 class RuleDefinition:
     """Single risk scoring rule"""
-    code: str  # Unique rule identifier
-    name: str  # Human-readable name
-    description: str  # What this rule detects
-    weight: int  # Points added when rule fires (0-100)
-    category: str  # execution, content, timestamp, size, location, etc.
+    code: str
+    name: str
+    description: str
+    weight: int
+    category: str
     enabled: bool = True
-    custom: bool = False  # User-created custom rule
+    custom: bool = False
     created_date: str = ""
     created_by: str = ""
 
@@ -47,11 +47,10 @@ class RuleVersion:
     changed_by: str
     change_reason: str
     rules: Dict[str, RuleDefinition] = field(default_factory=dict)
-    config_hash: str = ""  # Hash of configuration for integrity
+    config_hash: str = ""
 
     def calculate_hash(self) -> str:
         """Calculate SHA256 hash of this configuration"""
-        # Sort rules by code for consistent hashing
         sorted_rules = sorted(self.rules.items())
         config_str = json.dumps([(code, asdict(rule)) for code, rule in sorted_rules], sort_keys=True)
         return hashlib.sha256(config_str.encode()).hexdigest()[:16]
@@ -62,19 +61,17 @@ class WhyNotFlaggedResult:
     """Result of 'Why NOT flagged' analysis"""
     file_name: str
     total_score: int
-    threshold_not_met: int  # How many points short
+    threshold_not_met: int
     rules_checked: int
     rules_fired: int
-    rules_not_fired: List[Tuple[str, str, int]]  # (code, reason_why_not, potential_points)
+    rules_not_fired: List[Tuple[str, str, int]]
     recommendations: List[str]
 
 
 class RuleConfigManager:
     """Manages rule configurations with versioning"""
 
-    # Default rule weights (from RiskScorer)
     DEFAULT_RULES = {
-        # Execution-related
         'executable_in_user_dir': RuleDefinition(
             code='executable_in_user_dir',
             name='Executable in User Directory',
@@ -110,7 +107,6 @@ class RuleConfigManager:
             weight=95,
             category='execution'
         ),
-        # File naming
         'double_extension': RuleDefinition(
             code='double_extension',
             name='Double Extension',
@@ -125,7 +121,6 @@ class RuleConfigManager:
             weight=60,
             category='naming'
         ),
-        # Content-based
         'high_entropy': RuleDefinition(
             code='high_entropy',
             name='High Entropy Content',
@@ -140,7 +135,6 @@ class RuleConfigManager:
             weight=85,
             category='content'
         ),
-        # Timestamp anomalies
         'recently_deleted': RuleDefinition(
             code='recently_deleted',
             name='Recently Deleted',
@@ -162,7 +156,6 @@ class RuleConfigManager:
             weight=45,
             category='timestamp'
         ),
-        # Size anomalies
         'unusually_small_executable': RuleDefinition(
             code='unusually_small_executable',
             name='Unusually Small Executable',
@@ -180,10 +173,8 @@ class RuleConfigManager:
         self.versions: List[RuleVersion] = []
         self.current_version: Optional[RuleVersion] = None
 
-        # Load existing versions
         self._load_versions()
 
-        # Create initial version if none exists
         if not self.versions:
             self._create_initial_version()
 
@@ -211,7 +202,6 @@ class RuleConfigManager:
                     )
                     self.versions.append(version)
 
-                # Set current version to latest
                 if self.versions:
                     self.current_version = self.versions[-1]
                     print(f"[RuleConfig] Loaded {len(self.versions)} versions")
@@ -290,11 +280,9 @@ class RuleConfigManager:
             print(f"[RuleConfig] Invalid weight: {new_weight} (must be 0-100)")
             return False
 
-        # Create new version
         new_rules = {}
         for code, rule in self.current_version.rules.items():
             if code == rule_code:
-                # Create updated rule
                 updated_rule = RuleDefinition(
                     code=rule.code,
                     name=rule.name,
@@ -349,7 +337,6 @@ class RuleConfigManager:
             print(f"[RuleConfig] Rule already exists: {code}")
             return False
 
-        # Create new rule
         new_rule = RuleDefinition(
             code=code,
             name=name,
@@ -362,7 +349,6 @@ class RuleConfigManager:
             created_by=created_by
         )
 
-        # Create new version
         new_rules = self.current_version.rules.copy()
         new_rules[code] = new_rule
 
@@ -409,7 +395,6 @@ class RuleConfigManager:
             print(f"[RuleConfig] Version {version_num} not found")
             return False
 
-        # Create new version as copy of target
         new_version = RuleVersion(
             version=self.current_version.version + 1 if self.current_version else 1,
             timestamp=datetime.utcnow().isoformat(),
@@ -437,25 +422,20 @@ class RuleConfigManager:
         Returns:
             WhyNotFlaggedResult with analysis
         """
-        # Determine why rules didn't fire
         rules_not_fired = []
         for code, rule in self.current_version.rules.items():
             if code not in risk_score.reasons and rule.enabled:
-                # This rule didn't fire - analyze why
                 reason_why_not = self._explain_why_rule_not_fired(code, file_data)
                 rules_not_fired.append((code, reason_why_not, rule.weight))
 
-        # Calculate threshold gap
         high_risk_threshold = 70
         threshold_gap = max(0, high_risk_threshold - risk_score.score)
 
-        # Generate recommendations
         recommendations = []
         if threshold_gap > 0:
             recommendations.append(f"File scored {risk_score.score}/100, needs {threshold_gap} more points to be HIGH risk")
 
-            # Suggest which rules could push it over
-            for code, reason, weight in rules_not_fired[:5]:  # Top 5
+            for code, reason, weight in rules_not_fired[:5]:
                 if weight >= threshold_gap:
                     recommendations.append(f"Rule '{code}' ({weight} pts) would flag this file if conditions were met: {reason}")
 
@@ -471,7 +451,6 @@ class RuleConfigManager:
 
     def _explain_why_rule_not_fired(self, rule_code: str, file_data: Dict) -> str:
         """Explain why a specific rule didn't fire"""
-        # Simplified explanations
         explanations = {
             'executable_in_downloads': "File not in Downloads folder",
             'double_extension': "File does not have double extension",
@@ -516,7 +495,6 @@ class RuleConfigManager:
             return False
 
 
-# Singleton
 _rule_managers: Dict[str, RuleConfigManager] = {}
 
 def get_rule_config_manager(case_id: str = "default") -> RuleConfigManager:
