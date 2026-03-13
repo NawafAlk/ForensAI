@@ -16,7 +16,7 @@ from PySide6.QtGui import QIcon, QFont, QPalette, QBrush, QAction, QActionGroup,
 from PySide6.QtWidgets import (QMainWindow, QMenuBar, QMenu, QToolBar, QDockWidget, QTreeWidget, QTabWidget,
                                QFileDialog, QTreeWidgetItem, QTableWidget, QMessageBox, QTableWidgetItem,
                                QDialog, QVBoxLayout, QInputDialog, QDialogButtonBox, QHeaderView, QLabel, QLineEdit,
-                               QFormLayout, QApplication, QWidget, QHBoxLayout)
+                               QFormLayout, QApplication, QWidget, QHBoxLayout, QSizePolicy)
 
 from managers.database_manager import DatabaseManager
 from managers.evidence_utils import ImageHandler
@@ -240,12 +240,13 @@ class MainWindow(QMainWindow):
 
         # Dock-based layout: tree dock on the left, results as central widget
         tree_dock = QDockWidget('Tree View', self)
+        self.tree_viewer.setMinimumWidth(300)
         tree_dock.setWidget(self.tree_viewer)
         self.addDockWidget(Qt.LeftDockWidgetArea, tree_dock)
 
         self.result_viewer = QTabWidget(self)
         self.result_viewer.setObjectName("resultViewer")
-        self.result_viewer.setMinimumHeight(50)
+        self.result_viewer.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.setCentralWidget(self.result_viewer)
 
         self.listing_table = QTableWidget()
@@ -340,17 +341,13 @@ class MainWindow(QMainWindow):
         virus_total_key = self.api_keys.get('API_KEYS', 'virustotal', fallback='')
         self.virus_total_api.set_api_key(virus_total_key)
 
-        self.viewer_dock = QDockWidget('Viewer', self)
+        self.viewer_dock = QDockWidget('Utils', self)
         self.viewer_dock.setWidget(self.viewer_tab)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.viewer_dock)
 
-        # Allow free resizing by dragging the top edge
-        self.viewer_dock.setMinimumHeight(100)
-        self.viewer_dock.setFeatures(
-            QDockWidget.DockWidgetMovable |
-            QDockWidget.DockWidgetFloatable |
-            QDockWidget.DockWidgetClosable
-        )
+        self.viewer_dock.setMinimumSize(1200, 222)
+        self.viewer_dock.setMaximumSize(1200, 222)
+        self.viewer_dock.visibilityChanged.connect(self.on_viewer_dock_focus)
         self.viewer_tab.currentChanged.connect(self.display_content_for_active_tab)
 
         # disable all tabs before loading an image file
@@ -673,7 +670,12 @@ class MainWindow(QMainWindow):
         return item
 
     def on_viewer_dock_focus(self, visible):
-        pass
+        if visible:
+            self.viewer_dock.setMaximumSize(16777215, 16777215)
+        else:
+            current_height = self.viewer_dock.size().height()
+            self.viewer_dock.setMinimumSize(1200, current_height)
+            self.viewer_dock.setMaximumSize(1200, current_height)
 
     def clear_ui(self):
         self.listing_table.clearContents()
