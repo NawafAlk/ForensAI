@@ -1,7 +1,7 @@
 """
 Main application window for ForensAI.
 
-Provides the primary GUI shell including menu bar, toolbar, sidebar navigation,
+Provides the primary GUI shell including menu bar, toolbar,
 evidence tree, and tabbed analysis panels (hex, text, metadata, EXIF, registry,
 file carving, risk scoring, timeline, and more). Coordinates image loading,
 partition enumeration, file selection, and viewer updates.
@@ -39,7 +39,6 @@ from modules.virus_total_tab import VirusTotal
 from modules.priority_tab import PriorityTab
 from modules.case_audit_tab import CaseAuditTab
 from ui.mindmap import MindMapWidget
-from modules.sidebar_navigation import SidebarNavigation
 from modules.timeline_tab import TimelineTab
 
 SECTOR_SIZE = 512
@@ -230,10 +229,6 @@ class MainWindow(QMainWindow):
 
         self.addToolBar(Qt.TopToolBarArea, self.main_toolbar)
 
-        # Sidebar navigation
-        self.sidebar = SidebarNavigation(self)
-        self.sidebar.navigation_clicked.connect(self.on_sidebar_navigation)
-
         self.tree_viewer = QTreeWidget(self)
         self.tree_viewer.setObjectName("evidenceTree")
         self.tree_viewer.setIconSize(QSize(16, 16))
@@ -243,18 +238,16 @@ class MainWindow(QMainWindow):
         self.tree_viewer.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree_viewer.customContextMenuRequested.connect(self.open_tree_context_menu)
 
-        # QSplitter-based layout: sidebar | tree | results
+        # QSplitter-based layout: tree | results
         self.main_splitter = QSplitter(Qt.Horizontal, self)
-        self.main_splitter.addWidget(self.sidebar)
         self.main_splitter.addWidget(self.tree_viewer)
 
         self.result_viewer = QTabWidget(self)
         self.result_viewer.setObjectName("resultViewer")
         self.main_splitter.addWidget(self.result_viewer)
-        self.main_splitter.setSizes([200, 250, 750])
-        self.main_splitter.setStretchFactor(0, 0)
-        self.main_splitter.setStretchFactor(1, 1)
-        self.main_splitter.setStretchFactor(2, 3)
+        self.main_splitter.setSizes([250, 750])
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 3)
         self.setCentralWidget(self.main_splitter)
 
         self.listing_table = QTableWidget()
@@ -683,51 +676,6 @@ class MainWindow(QMainWindow):
 
     def on_viewer_dock_focus(self, visible):
         pass
-
-    def on_sidebar_navigation(self, section_name):
-        """Handle sidebar navigation clicks."""
-        tab_map = {
-            'Add Evidence': None,
-            'Remove Evidence': None,
-            'Mount Image': None,
-            'File Listing': 0,
-            'Deleted Files': 1,
-            'Registry': 2,
-            'File Search': 3,
-            'Mind Map': 4,
-            'Priority Scan': 5,
-            'Case Audit': 6,
-            'Timeline': 7,
-        }
-
-        # Handle action items
-        if section_name == 'Add Evidence':
-            self.load_image_evidence()
-            return
-        elif section_name == 'Remove Evidence':
-            self.remove_image_evidence()
-            return
-        elif section_name == 'Mount Image':
-            self.image_manager.mount_image()
-            return
-        elif section_name == 'Disk Imaging':
-            self.show_acquire_dialog()
-            return
-        elif section_name == 'Convert E01':
-            self.show_conversion_widget()
-            return
-        elif section_name == 'Report Generator':
-            self.show_report_generator_dialog()
-            return
-        elif section_name == 'Veriphone API':
-            self.show_veriphone_widget()
-            return
-
-        # Handle tab navigation
-        tab_index = tab_map.get(section_name)
-        if tab_index is not None:
-            self.result_viewer.setCurrentIndex(tab_index)
-        self.sidebar.set_active(section_name)
 
     def clear_ui(self):
         self.listing_table.clearContents()

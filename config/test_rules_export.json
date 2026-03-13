@@ -1,6 +1,6 @@
 {
-  "version": 7,
-  "timestamp": "2025-11-25T20:35:49.807902",
+  "version": 10,
+  "timestamp": "2026-02-16T14:23:32.483878",
   "changed_by": "test_admin",
   "change_reason": "Rolled back to version 1: Reverting experimental changes",
   "config_hash": "f769644f363742b1",

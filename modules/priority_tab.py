@@ -20,12 +20,24 @@ from datetime import datetime
 
 try:
     from managers.risk_scorer import get_risk_scorer, RiskScorer
-    from managers.ai_service import get_ai_service
-    from managers.notes_manager import get_notes_manager, Note
-    from managers.audit_logger import get_audit_logger
     RISK_SCORING_AVAILABLE = True
 except ImportError:
     RISK_SCORING_AVAILABLE = False
+
+try:
+    from managers.ai_service import get_ai_service
+except ImportError:
+    get_ai_service = None
+
+try:
+    from managers.notes_manager import get_notes_manager, Note
+except ImportError:
+    get_notes_manager = None
+
+try:
+    from managers.audit_logger import get_audit_logger
+except ImportError:
+    get_audit_logger = None
 
 
 class RiskScoringThread(QThread):
@@ -489,6 +501,14 @@ class PriorityTab(QWidget):
         file_data = self.current_selected_file
 
         # Check AI availability
+        if get_ai_service is None:
+            QMessageBox.warning(
+                self,
+                "AI Unavailable",
+                "AI service module could not be loaded.\n\n"
+                "Please check that all dependencies are installed."
+            )
+            return
         ai_service = get_ai_service()
         if not ai_service.is_available():
             QMessageBox.warning(

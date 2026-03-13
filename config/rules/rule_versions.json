@@ -1,6 +1,6 @@
 {
-  "updated": "2025-11-25T20:35:49.809901",
-  "version_count": 7,
+  "updated": "2026-02-16T14:23:32.486879",
+  "version_count": 10,
   "versions": [
     {
       "version": 1,
@@ -939,6 +939,473 @@
     {
       "version": 7,
       "timestamp": "2025-11-25T20:35:49.807902",
+      "changed_by": "test_admin",
+      "change_reason": "Rolled back to version 1: Reverting experimental changes",
+      "rules": {
+        "executable_in_user_dir": {
+          "code": "executable_in_user_dir",
+          "name": "Executable in User Directory",
+          "description": "System executable found in user directory (potential masquerading)",
+          "weight": 85,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_temp": {
+          "code": "executable_in_temp",
+          "name": "Executable in Temp Folder",
+          "description": "Executable found in temporary directory",
+          "weight": 90,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_downloads": {
+          "code": "executable_in_downloads",
+          "name": "Executable in Downloads",
+          "description": "Executable found in Downloads folder",
+          "weight": 80,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_appdata": {
+          "code": "executable_in_appdata",
+          "name": "Executable in AppData",
+          "description": "Executable in AppData folder (common malware location)",
+          "weight": 75,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "system_file_wrong_location": {
+          "code": "system_file_wrong_location",
+          "name": "System File in Wrong Location",
+          "description": "Known system file found outside system directories",
+          "weight": 95,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "double_extension": {
+          "code": "double_extension",
+          "name": "Double Extension",
+          "description": "File has double extension (e.g., .pdf.exe) indicating masquerading",
+          "weight": 65,
+          "category": "naming",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "suspicious_extension": {
+          "code": "suspicious_extension",
+          "name": "Suspicious Extension",
+          "description": "File has potentially dangerous extension",
+          "weight": 60,
+          "category": "naming",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "high_entropy": {
+          "code": "high_entropy",
+          "name": "High Entropy Content",
+          "description": "File has high entropy (possible encryption/packing)",
+          "weight": 70,
+          "category": "content",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "extremely_high_entropy": {
+          "code": "extremely_high_entropy",
+          "name": "Extremely High Entropy",
+          "description": "File has very high entropy (likely encrypted/packed)",
+          "weight": 85,
+          "category": "content",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "recently_deleted": {
+          "code": "recently_deleted",
+          "name": "Recently Deleted",
+          "description": "File was recently deleted",
+          "weight": 65,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "timestomp_detected": {
+          "code": "timestomp_detected",
+          "name": "Timestomp Detected",
+          "description": "File timestamps appear manipulated",
+          "weight": 95,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "created_equals_modified": {
+          "code": "created_equals_modified",
+          "name": "Created = Modified Time",
+          "description": "Created and modified timestamps are identical",
+          "weight": 45,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "unusually_small_executable": {
+          "code": "unusually_small_executable",
+          "name": "Unusually Small Executable",
+          "description": "Executable is suspiciously small",
+          "weight": 55,
+          "category": "size",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        }
+      },
+      "config_hash": "f769644f363742b1"
+    },
+    {
+      "version": 8,
+      "timestamp": "2026-02-16T14:23:32.472883",
+      "changed_by": "test_investigator",
+      "change_reason": "Adjusted 'double_extension' weight from 65 to 75: Increased due to prevalence in recent investigations",
+      "rules": {
+        "executable_in_user_dir": {
+          "code": "executable_in_user_dir",
+          "name": "Executable in User Directory",
+          "description": "System executable found in user directory (potential masquerading)",
+          "weight": 85,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_temp": {
+          "code": "executable_in_temp",
+          "name": "Executable in Temp Folder",
+          "description": "Executable found in temporary directory",
+          "weight": 90,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_downloads": {
+          "code": "executable_in_downloads",
+          "name": "Executable in Downloads",
+          "description": "Executable found in Downloads folder",
+          "weight": 80,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_appdata": {
+          "code": "executable_in_appdata",
+          "name": "Executable in AppData",
+          "description": "Executable in AppData folder (common malware location)",
+          "weight": 75,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "system_file_wrong_location": {
+          "code": "system_file_wrong_location",
+          "name": "System File in Wrong Location",
+          "description": "Known system file found outside system directories",
+          "weight": 95,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "double_extension": {
+          "code": "double_extension",
+          "name": "Double Extension",
+          "description": "File has double extension (e.g., .pdf.exe) indicating masquerading",
+          "weight": 75,
+          "category": "naming",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "suspicious_extension": {
+          "code": "suspicious_extension",
+          "name": "Suspicious Extension",
+          "description": "File has potentially dangerous extension",
+          "weight": 60,
+          "category": "naming",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "high_entropy": {
+          "code": "high_entropy",
+          "name": "High Entropy Content",
+          "description": "File has high entropy (possible encryption/packing)",
+          "weight": 70,
+          "category": "content",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "extremely_high_entropy": {
+          "code": "extremely_high_entropy",
+          "name": "Extremely High Entropy",
+          "description": "File has very high entropy (likely encrypted/packed)",
+          "weight": 85,
+          "category": "content",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "recently_deleted": {
+          "code": "recently_deleted",
+          "name": "Recently Deleted",
+          "description": "File was recently deleted",
+          "weight": 65,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "timestomp_detected": {
+          "code": "timestomp_detected",
+          "name": "Timestomp Detected",
+          "description": "File timestamps appear manipulated",
+          "weight": 95,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "created_equals_modified": {
+          "code": "created_equals_modified",
+          "name": "Created = Modified Time",
+          "description": "Created and modified timestamps are identical",
+          "weight": 45,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "unusually_small_executable": {
+          "code": "unusually_small_executable",
+          "name": "Unusually Small Executable",
+          "description": "Executable is suspiciously small",
+          "weight": 55,
+          "category": "size",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        }
+      },
+      "config_hash": "54b6fcb5b6f9b02e"
+    },
+    {
+      "version": 9,
+      "timestamp": "2026-02-16T14:23:32.477878",
+      "changed_by": "test_investigator",
+      "change_reason": "Added custom rule 'custom_macros_detected' (Macros Detected in Document)",
+      "rules": {
+        "executable_in_user_dir": {
+          "code": "executable_in_user_dir",
+          "name": "Executable in User Directory",
+          "description": "System executable found in user directory (potential masquerading)",
+          "weight": 85,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_temp": {
+          "code": "executable_in_temp",
+          "name": "Executable in Temp Folder",
+          "description": "Executable found in temporary directory",
+          "weight": 90,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_downloads": {
+          "code": "executable_in_downloads",
+          "name": "Executable in Downloads",
+          "description": "Executable found in Downloads folder",
+          "weight": 80,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "executable_in_appdata": {
+          "code": "executable_in_appdata",
+          "name": "Executable in AppData",
+          "description": "Executable in AppData folder (common malware location)",
+          "weight": 75,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "system_file_wrong_location": {
+          "code": "system_file_wrong_location",
+          "name": "System File in Wrong Location",
+          "description": "Known system file found outside system directories",
+          "weight": 95,
+          "category": "execution",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "double_extension": {
+          "code": "double_extension",
+          "name": "Double Extension",
+          "description": "File has double extension (e.g., .pdf.exe) indicating masquerading",
+          "weight": 75,
+          "category": "naming",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "suspicious_extension": {
+          "code": "suspicious_extension",
+          "name": "Suspicious Extension",
+          "description": "File has potentially dangerous extension",
+          "weight": 60,
+          "category": "naming",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "high_entropy": {
+          "code": "high_entropy",
+          "name": "High Entropy Content",
+          "description": "File has high entropy (possible encryption/packing)",
+          "weight": 70,
+          "category": "content",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "extremely_high_entropy": {
+          "code": "extremely_high_entropy",
+          "name": "Extremely High Entropy",
+          "description": "File has very high entropy (likely encrypted/packed)",
+          "weight": 85,
+          "category": "content",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "recently_deleted": {
+          "code": "recently_deleted",
+          "name": "Recently Deleted",
+          "description": "File was recently deleted",
+          "weight": 65,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "timestomp_detected": {
+          "code": "timestomp_detected",
+          "name": "Timestomp Detected",
+          "description": "File timestamps appear manipulated",
+          "weight": 95,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "created_equals_modified": {
+          "code": "created_equals_modified",
+          "name": "Created = Modified Time",
+          "description": "Created and modified timestamps are identical",
+          "weight": 45,
+          "category": "timestamp",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "unusually_small_executable": {
+          "code": "unusually_small_executable",
+          "name": "Unusually Small Executable",
+          "description": "Executable is suspiciously small",
+          "weight": 55,
+          "category": "size",
+          "enabled": true,
+          "custom": false,
+          "created_date": "",
+          "created_by": ""
+        },
+        "custom_macros_detected": {
+          "code": "custom_macros_detected",
+          "name": "Macros Detected in Document",
+          "description": "Office document contains macros (potential malware vector)",
+          "weight": 70,
+          "category": "content",
+          "enabled": true,
+          "custom": true,
+          "created_date": "2026-02-16T14:23:32.477878",
+          "created_by": "test_investigator"
+        }
+      },
+      "config_hash": "9bc831b49315ba63"
+    },
+    {
+      "version": 10,
+      "timestamp": "2026-02-16T14:23:32.483878",
       "changed_by": "test_admin",
       "change_reason": "Rolled back to version 1: Reverting experimental changes",
       "rules": {
