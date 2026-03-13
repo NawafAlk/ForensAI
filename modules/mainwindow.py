@@ -16,7 +16,7 @@ from PySide6.QtGui import QIcon, QFont, QPalette, QBrush, QAction, QActionGroup,
 from PySide6.QtWidgets import (QMainWindow, QMenuBar, QMenu, QToolBar, QDockWidget, QTreeWidget, QTabWidget,
                                QFileDialog, QTreeWidgetItem, QTableWidget, QMessageBox, QTableWidgetItem,
                                QDialog, QVBoxLayout, QInputDialog, QDialogButtonBox, QHeaderView, QLabel, QLineEdit,
-                               QFormLayout, QApplication, QSplitter, QWidget, QHBoxLayout)
+                               QFormLayout, QApplication, QWidget, QHBoxLayout)
 
 from managers.database_manager import DatabaseManager
 from managers.evidence_utils import ImageHandler
@@ -238,17 +238,15 @@ class MainWindow(QMainWindow):
         self.tree_viewer.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree_viewer.customContextMenuRequested.connect(self.open_tree_context_menu)
 
-        # QSplitter-based layout: tree | results
-        self.main_splitter = QSplitter(Qt.Horizontal, self)
-        self.main_splitter.addWidget(self.tree_viewer)
+        # Dock-based layout: tree dock on the left, results as central widget
+        tree_dock = QDockWidget('Tree View', self)
+        tree_dock.setWidget(self.tree_viewer)
+        self.addDockWidget(Qt.LeftDockWidgetArea, tree_dock)
 
         self.result_viewer = QTabWidget(self)
         self.result_viewer.setObjectName("resultViewer")
-        self.main_splitter.addWidget(self.result_viewer)
-        self.main_splitter.setSizes([250, 750])
-        self.main_splitter.setStretchFactor(0, 1)
-        self.main_splitter.setStretchFactor(1, 3)
-        self.setCentralWidget(self.main_splitter)
+        self.result_viewer.setMinimumHeight(50)
+        self.setCentralWidget(self.result_viewer)
 
         self.listing_table = QTableWidget()
         self.listing_table.setObjectName("listingTable")
